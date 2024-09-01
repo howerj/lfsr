@@ -1,0 +1,9 @@
+*.exe
+*.o
+*.a
+*.dll
+*.so
+*~
+lfsr
+*.txt
+*.bin
