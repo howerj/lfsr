@@ -7,3 +7,5 @@
 lfsr
 *.txt
 *.bin
+*.hex
+*.inc

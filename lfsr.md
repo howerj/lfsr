@@ -17,6 +17,10 @@ with using an LFSR as a counter is that the program is scrambled.
 From a software point of view a LFSR (both the VM and the tool-chain) appear
 more complex, only in hardware are LFSR simpler.
 
+Using a LFSR is quite a good choice when gates are at a premium and the counter
+value does not have to be visible to a user of it (such as a delay counter, or
+a counter for a stack).
+
 # To Do / Notes
 
 * Jump to zero would indicate a halt, alternatively it might need to contain a
@@ -49,3 +53,4 @@ all:
 * <https://github.com/howerj/bit-serial>
 * <https://en.wikipedia.org/wiki/Forth_(programming_language)>
 * <https://stackoverflow.com/questions/1149929>
+* <https://www.fpga4fun.com/Counters3.html>
