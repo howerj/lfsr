@@ -11,4 +11,4 @@ lfsr.hex: lfsr.fth
 	gforth $<
 
 clean:
-	rm -rf lfsr *.exe
+	git clean -dffx

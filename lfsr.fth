@@ -92,11 +92,19 @@ size =cell - tep !
 variable pc 1 pc !
 $240 constant polynomial
 $3FF constant period
+
+\ $110 constant polynomial
+\ $1FF constant period
+
+\ $B8 constant polynomial
+\ $FF constant period
+
 : lfsr 
   dup 1 and ( mask off feed back )
   swap 1 rshift swap ( state /= 2 )
   if polynomial xor then ; ( xor in poly if feedback set )
-: pc++ pc @ dup lfsr pc ! ;
+: pc++ pc @ lfsr pc ! ;
+
 \ TODO: Calculate stats?
 
 : :m meta.1 +order also definitions : ;
@@ -158,7 +166,7 @@ $3FF constant period
 :m tvar   get-current >r meta.1 set-current 
           create r> set-current there , t, does> @ ;m
 :m label: get-current >r meta.1 set-current 
-          create r> set-current there ,    does> @ ;m
+          create r> set-current pc @ ,    does> @ ;m
 :m tdown =cell negate and ;m
 :m tnfa =cell + ;m ( pwd -- nfa : move to name field address )
 :m tcfa tnfa dup c@ $1F and + =cell + tdown ;m ( pwd -- cfa )
@@ -168,37 +176,42 @@ $3FF constant period
 :m >tbody =cell + ( =cell + =cell + ) ;m
 :m tv' t' >tbody ;m ( address of variable )
 :m t2/ 2/ ;m
+:m t2* 2* ;m
+:m unlfsr period 2* there - tallot ;m
+:m pc, pc @ 2* t! pc++ ;m
 
-: iLOAD-C  2/ 0000 or t, ; \ Store address
-: iLOAD    2/ 1000 or t, ;
-: iSTORE   2/ 2000 or t, ;
-: iLITERAL    3000 or t, ; \ Load 12-bit literal into accm
-: iSTORE-C 2/ 4000 or t, ; \ Load address
-: iADD     5000 or t, ;
-: iNOP1    6000 or t, ;
-: iAND     7000 or t, ;
-: iOR      8000 or t, ;
-: iXOR     9000 or t, ;
-: iRSHIFT  A000 t, ;
-: iJUMP    B000 or t, ; \ Unconditional jump
-: iJUMPZ   C000 or t, ; \ Conditional Jump!
-: iNOP2    D000 or t, ;
-: iCALL    E000 or t, ;
-: iPC!     F000 or t, ;
+: iLOAD-C  2/ 0000 or pc, ; \ Store address
+: iLOAD    2/ 1000 or pc, ;
+: iSTORE   2/ 2000 or pc, ;
+: iLITERAL    3000 or pc, ; \ Load 12-bit literal into accm
+: iSTORE-C 2/ 4000 or pc, ; \ Load address
+: iADD     5000 or pc, ;
+: iNOP1    6000 or pc, ;
+: iAND     7000 or pc, ;
+: iOR      8000 or pc, ;
+: iXOR     9000 or pc, ;
+: iRSHIFT  A000 pc, ;
+: iJUMP    B000 or pc, ; \ Unconditional jump
+: iJUMPZ   C000 or pc, ; \ Conditional Jump!
+: iNOP2    D000 or pc, ;
+: iCALL    E000 or pc, ;
+: iPC!     F000 or pc, ;
+
+: .x $58 iLITERAL -1 iSTORE-C ;
 
 : branch 2/ iJUMP ;
 : ?branch 2/ iJUMPZ ;
 : call 2/ ( iJUMP -> ) B000 or ;
 : thread 2/ ;
-: thread, thread t, ;
+: thread, thread t, ; \ TODO: Fix?
 :m postpone t' thread, ;m
 
 assembler.1 +order also definitions
-: begin there ;
+: begin pc @ 2* ;
 : until ?branch ;
 : again branch ;
-: if there 0 ?branch ;
-: mark there 0 branch ;
+: if begin 0 ?branch ;
+: mark begin 0 branch ;
 : then begin 2/ over t@ or swap t! ;
 : else mark swap then ;
 : while if swap ;
@@ -208,9 +221,11 @@ meta.1 +order also definitions
 
 \ --- ---- ---- ---- image generation   ---- ---- ---- ---- --- 
 
-0 t,  \ halt condition of VM, we start at next address
+B001 t,  \ halt condition of VM, we start at next address
 label: entry ( previous instructions are irrelevant )
 0 t,  \ entry point of VM
+unlfsr
+
 
    \ Constants not variables
    1 tvar @1        \ must contain `1`
@@ -282,7 +297,7 @@ assembler.1 -order
 :m a: ( "name" -- : assembly only routine, no header )
   CAFED00D
   target.1 +order also definitions
-  create talign there ,
+  create talign pc @ ,
   assembler.1 +order
   does> @ thread, ;m
 :m (a); CAFED00D <> if abort" unstructured" then 
@@ -509,9 +524,11 @@ a: (key) ( -- u )
   tos iSTORE-C
   a;
 
-there .( MEMORY USED FOR VM ) . cr
+\ there .( MEMORY USED FOR VM ) . cr
 
-there t2/ negate primitive t! \ Forth code after this
+\ unlfsr
+period t2* negate primitive t!
+\ there t2/ negate primitive t! \ Forth code after this
 \ --- ---- ---- ---- no more direct assembly ---- ---- ---- --- 
 
 assembler.1 -order

@@ -33,6 +33,11 @@ a counter for a stack).
 * Port a Forth implementation to the machine.
 * Port to an FPGA, make a bit-serial version?
 * Implement in 7400 series logic?
+* It might be cheaper (in terms of gates) to do the following:
+  - Implement the Forth stacks using LFSR if the ADD instruction is not
+  present, this will require an LFSR that can count up and down.
+  - Always increment the Program Counter, even for a jump instruction. This
+  *might* save on control logic
 * Addition without the "+", in case we want to design a CPU without an adder at
 all:
 
@@ -45,6 +50,9 @@ all:
 		return a;
 	}
 
+* Is there a way of calculating the nth value of a LFSR without cycling through
+  the intermediate states?
+
 # References
 
 * <https://en.wikipedia.org/wiki/Linear-feedback_shift_register>
@@ -54,3 +62,4 @@ all:
 * <https://en.wikipedia.org/wiki/Forth_(programming_language)>
 * <https://stackoverflow.com/questions/1149929>
 * <https://www.fpga4fun.com/Counters3.html>
+* <https://groups.google.com/g/comp.lang.vhdl/c/GiFdsYfaeHA>

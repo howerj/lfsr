@@ -9,3 +9,5 @@ lfsr
 *.bin
 *.hex
 *.inc
+t
+add

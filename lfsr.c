@@ -6,8 +6,19 @@
 #include <assert.h>
 
 #define SZ (0x2000)
+
+#define COUNT (2)
+
+#if COUNT == 0
 #define POLY (0x240)
 #define PERIOD (1023)
+#elif COUNT == 1
+#define POLY (0x110)
+#define PERIOD (511)
+#elif COUNT == 2
+#define POLY (0xB8)
+#define PERIOD (255)
+#endif
 
 typedef struct {
 	uint16_t m[SZ], pc, a;
