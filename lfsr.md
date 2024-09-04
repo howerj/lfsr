@@ -51,7 +51,13 @@ all:
 	}
 
 * Is there a way of calculating the nth value of a LFSR without cycling through
-  the intermediate states?
+  the intermediate states? 
+* A common way of using a counter in hardware to count to a power of two is to
+  treat the topmost bit as the output, this means you do not have to use a
+  comparator. Using a LFSR, with the correct Polynomials, it should be possible
+  to count to a non-power of two value, and have that toggle the top most bit,
+  which could also be used to reset the LFSR. The problem is in calculating
+  those values.
 
 # References
 

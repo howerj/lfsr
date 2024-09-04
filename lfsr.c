@@ -7,7 +7,13 @@
 
 #define SZ (0x2000)
 
+#ifndef MODE
+#define MODE  (1)
+#endif
+
+#ifndef COUNT
 #define COUNT (2)
+#endif
 
 #if COUNT == 0
 #define POLY (0x240)
@@ -19,6 +25,7 @@
 #define POLY (0xB8)
 #define PERIOD (255)
 #endif
+
 
 typedef struct {
 	uint16_t m[SZ], pc, a;
@@ -38,6 +45,8 @@ static uint16_t lfsr(uint16_t lfsr, uint16_t polynomial_mask) {
 
 static inline uint16_t next(vm_t *v, uint16_t pc) {
 	assert(v);
+	if (MODE == 0)
+		return pc + 1;
 	return lfsr(pc, POLY);
 }
 
@@ -58,7 +67,7 @@ static inline void store(vm_t *v, uint16_t addr, uint16_t val) {
 static int run(vm_t *v) {
 	assert(v);
 	uint16_t pc = v->pc, a = v->pc, *m = v->m; /* load machine state */
-	for (;pc;) { // TODO: Might be able to reduce LFSR state to 9-bit? (511 values for maximal period)
+	for (;;) { // TODO: Might be able to reduce LFSR state to 9-bit? (511 values for maximal period)
 		const uint16_t ins = m[pc % SZ];
 		const uint16_t imm = ins & 0xFFF;
 		const uint16_t alu = (ins >> 12) & 0xF;
@@ -76,15 +85,17 @@ static int run(vm_t *v) {
 		case 9: a ^= load(v, imm); pc = _pc; break;
 		case 10: a >>= 1; pc = _pc; break;
 
-		case 11: pc = imm; break;
+		case 11: if (pc == imm) goto end; pc = imm; break;
 		case 12: pc = _pc; if (!a) pc = imm; break;
 		case 15: pc = load(v, imm); break;
 
+		case 3: a = imm; pc = _pc; break; // TODO: Remove?
 		case 6: pc = _pc; break;
 		case 13: pc = _pc; break;
 		case 14: pc = _pc; break;
 		}
 	}
+end:
 	v->pc = pc; /* save machine state */
 	v->a = a;
 	return 0;
