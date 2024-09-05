@@ -166,7 +166,7 @@ $3FF constant period
 :m tvar   get-current >r meta.1 set-current 
           create r> set-current there , t, does> @ ;m
 :m label: get-current >r meta.1 set-current 
-          create r> set-current pc @ ,    does> @ ;m
+          create r> set-current pc @ 2* ,    does> @ ;m
 :m tdown =cell negate and ;m
 :m tnfa =cell + ;m ( pwd -- nfa : move to name field address )
 :m tcfa tnfa dup c@ $1F and + =cell + tdown ;m ( pwd -- cfa )
@@ -197,8 +197,6 @@ $3FF constant period
 : iCALL    E000 or pc, ;
 : iPC!     F000 or pc, ;
 
-: .x $58 iLITERAL -1 iSTORE-C ;
-
 : branch 2/ iJUMP ;
 : ?branch 2/ iJUMPZ ;
 : call 2/ ( iJUMP -> ) B000 or ;
@@ -226,11 +224,12 @@ label: entry ( previous instructions are irrelevant )
 0 t,  \ entry point of VM
 unlfsr
 
-
    \ Constants not variables
    1 tvar @1        \ must contain `1`
 8000 tvar high      \ must contain `8000`
 FFFF tvar set       \ all bits set, -1
+
+\ : .x $58 iLITERAL set iSTORE ; .x
 
   \ These variables, along with some defined in the Forth
   \ code, need to be written to, hampering turning the
@@ -248,6 +247,8 @@ FFFF tvar set       \ all bits set, -1
 
 TERMBUF =buf + constant =tbufend
 
+\ TODO: If we remove the iAND instruction we can replace this
+\ with another LFSR, for up/down counting.
 : one @1 2/ ;
 : vcell one ;
 : -vcell set 2/ ;
@@ -259,7 +260,8 @@ TERMBUF =buf + constant =tbufend
 \ --- ---- ---- ---- Forth VM ---- ---- ---- ---- ---- ---- --- 
 
 label: start \ Forth VM entry point
-  start call entry t! \ Set entry point
+  \ TODO: next line seems incorrect.
+  start call  entry t! \ Set entry point
   {sp0} iLOAD-C {sp} iSTORE-C \ Set initial v.stk ptr
   {rp0} iLOAD-C {rp} iSTORE-C \ Set initial r.stk ptr
   <cold> iLOAD-C      \ Load initial word to execute
@@ -268,11 +270,16 @@ label: start \ Forth VM entry point
 label: vm ( The Forth virtual machine )
 assembler.1 +order
 
+
   ip iLOAD-C      \ load `ip`, or instruction pointer
   t iSTORE-C      \ save a copy
+\ TODO: If iADD instruction is removed, this might be difficult
+\ to get rid of.
   one iADD        \ increment ptr to next instruction
   ip iSTORE-C     \ `ip` points to the next instruction
   t iLOAD         \ load current instruction
+\ TODO: This iADD can be removed if we jump on some higher bits
+\ being set, if iADD instruction is removed
 primitive 2/ iADD \ subtract location (primitive is negated)
 high 2/ iAND      \ is high bit set?
   if              \ yes: must be instruction
@@ -297,7 +304,7 @@ assembler.1 -order
 :m a: ( "name" -- : assembly only routine, no header )
   CAFED00D
   target.1 +order also definitions
-  create talign pc @ ,
+  create talign pc @ 2* ,
   assembler.1 +order
   does> @ thread, ;m
 :m (a); CAFED00D <> if abort" unstructured" then 

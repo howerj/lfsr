@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#ifndef COUNT
 #define COUNT 0
+#endif
 
 #if COUNT == 0
 #define POLY (0x240)

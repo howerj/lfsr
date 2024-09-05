@@ -224,6 +224,7 @@ TERMBUF =buf + constant =tbufend
 
 label: start \ Forth VM entry point
   start call entry t! \ Set entry point
+  ( $58 iLITERAL set iSTORE )
   {sp0} iLOAD-C {sp} iSTORE-C \ Set initial v.stk ptr
   {rp0} iLOAD-C {rp} iSTORE-C \ Set initial r.stk ptr
   <cold> iLOAD-C      \ Load initial word to execute
