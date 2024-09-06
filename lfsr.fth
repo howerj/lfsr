@@ -90,11 +90,11 @@ size =cell - tep !
 0 tlast !
 
 variable pc 1 pc !
-$240 constant polynomial
-$3FF constant period
+\ $240 constant polynomial
+\ $3FF constant period
 
-\ $110 constant polynomial
-\ $1FF constant period
+$110 constant polynomial
+$1FF constant period
 
 \ $B8 constant polynomial
 \ $FF constant period
@@ -179,6 +179,7 @@ $3FF constant period
 :m t2* 2* ;m
 :m unlfsr period 2* there - tallot ;m
 :m pc, pc @ 2* t! pc++ ;m
+: .m .s cr ;m
 
 : iLOAD-C  2/ 0000 or pc, ; \ Store address
 : iLOAD    2/ 1000 or pc, ;
@@ -221,7 +222,7 @@ meta.1 +order also definitions
 
 B001 t,  \ halt condition of VM, we start at next address
 label: entry ( previous instructions are irrelevant )
-0 t,  \ entry point of VM
+0 pc,  \ entry point of VM
 unlfsr
 
    \ Constants not variables
@@ -229,7 +230,6 @@ unlfsr
 8000 tvar high      \ must contain `8000`
 FFFF tvar set       \ all bits set, -1
 
-\ : .x $58 iLITERAL set iSTORE ; .x
 
   \ These variables, along with some defined in the Forth
   \ code, need to be written to, hampering turning the
@@ -259,9 +259,10 @@ TERMBUF =buf + constant =tbufend
 
 \ --- ---- ---- ---- Forth VM ---- ---- ---- ---- ---- ---- --- 
 
+ : .x $58 iLITERAL set iSTORE ;
 label: start \ Forth VM entry point
-  \ TODO: next line seems incorrect.
   start call  entry t! \ Set entry point
+
   {sp0} iLOAD-C {sp} iSTORE-C \ Set initial v.stk ptr
   {rp0} iLOAD-C {rp} iSTORE-C \ Set initial r.stk ptr
   <cold> iLOAD-C      \ Load initial word to execute
@@ -269,7 +270,6 @@ label: start \ Forth VM entry point
   \ -- fall-through --
 label: vm ( The Forth virtual machine )
 assembler.1 +order
-
 
   ip iLOAD-C      \ load `ip`, or instruction pointer
   t iSTORE-C      \ save a copy
@@ -407,7 +407,7 @@ a: opNext
 :m aft drop mark begin swap ;m
 :m next talign opNext 2/ t, ;m
 
-a: bye there branch (a);   ( -- : bye bye! )
+a: bye pc @ 2* branch (a);   ( -- : bye bye! )
 
 a: and ( u u -- u : bit wise AND )
   {sp} iLOAD
@@ -534,7 +534,7 @@ a: (key) ( -- u )
 \ there .( MEMORY USED FOR VM ) . cr
 
 \ unlfsr
-period t2* negate primitive t!
+period 1+ t2* negate primitive t!
 \ there t2/ negate primitive t! \ Forth code after this
 \ --- ---- ---- ---- no more direct assembly ---- ---- ---- --- 
 
@@ -890,6 +890,7 @@ save-header lfsr.inc
 save-target lfsr.bin
 .stat
 .end
+
 .( DONE ) cr
 bye
 

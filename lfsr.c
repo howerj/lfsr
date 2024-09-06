@@ -12,7 +12,7 @@
 #endif
 
 #ifndef COUNT
-#define COUNT (2)
+#define COUNT (1)
 #endif
 
 #if COUNT == 0
@@ -117,7 +117,7 @@ static int option(const char *opt) {
 }
 
 int main(int argc, char **argv) {
-	vm_t vm = { .pc = 1, .put = put, .get = get, .in = stdin, .out = stdout, };
+	vm_t vm = { .pc = 0, .put = put, .get = get, .in = stdin, .out = stdout, };
 	vm.debug = option("DEBUG") ? stderr : NULL; /* lazy options */
 	if (argc < 2) {
 		(void)fprintf(stderr, "Usage: %s prog.hex\n", argv[0]);

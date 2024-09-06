@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 #ifndef COUNT
-#define COUNT 0
+#define COUNT 1
 #endif
 
 #if COUNT == 0
@@ -41,7 +41,7 @@ static uint16_t rlfsr(uint16_t lfsr, uint16_t polynomial_mask) {
 int main(void) {
 	uint16_t s = 1, r = 1;
 	for (int i = 0; i <= PERIOD; i++) {
-		if (fprintf(stdout, "%d %d\n", s, r) < 0) return 1;
+		if (fprintf(stdout, "%x %x\n", s, r) < 0) return 1;
 		s = lfsr(s, POLY);
 		r = rlfsr(r, REV); 
 	}
