@@ -5,9 +5,7 @@
 * Email: <mailto:howe.r.j.89@gmail.com>
 * Repo: <https://github.com/howerj/lfsr>
 
-**PLACE HOLDER PROJECT**
-
-**THIS PROJECT IS A WORK IN PROGRESS AND DOES NOT YET WORK**.
+**This project is working, but is still a work in progress**.
 
 A virtual machine that uses a Linear Feedback Shift Register (LFSR) instead of a
 normal program counter. The reason for doing this (historically) is that a normal 

@@ -3,8 +3,6 @@
 \ Repo: https://github.com/howerj/lfsr
 \ License: MIT
 \
-\ **WORK IN PROGRESS**
-\
 \ Cross Compiler and eForth interpreter for a (currently
 \ in the design stage) CPU which will be built out of 7400
 \ series logic. This Forth is based of a eForth implementation
@@ -93,19 +91,17 @@ variable pc 1 pc !
 \ $240 constant polynomial
 \ $3FF constant period
 
-$110 constant polynomial
-$1FF constant period
+\ $110 constant polynomial
+\ $1FF constant period
 
-\ $B8 constant polynomial
-\ $FF constant period
+$B8 constant polynomial
+$FF constant period
 
 : lfsr 
   dup 1 and ( mask off feed back )
   swap 1 rshift swap ( state /= 2 )
   if polynomial xor then ; ( xor in poly if feedback set )
 : pc++ pc @ lfsr pc ! ;
-
-\ TODO: Calculate stats?
 
 : :m meta.1 +order also definitions : ;
 : ;m postpone ; ; immediate
@@ -177,7 +173,7 @@ $1FF constant period
 :m tv' t' >tbody ;m ( address of variable )
 :m t2/ 2/ ;m
 :m t2* 2* ;m
-:m unlfsr period 2* there - tallot ;m
+:m unlfsr period 2* there - 2* tallot ;m \ TODO: Why 2*?
 :m pc, pc @ 2* t! pc++ ;m
 : .m .s cr ;m
 
@@ -195,7 +191,7 @@ $1FF constant period
 : iJUMP    B000 or pc, ; \ Unconditional jump
 : iJUMPZ   C000 or pc, ; \ Conditional Jump!
 : iNOP2    D000 or pc, ;
-: iCALL    E000 or pc, ;
+: iNOP3    E000 or pc, ;
 : iPC!     F000 or pc, ;
 
 : branch 2/ iJUMP ;
@@ -230,7 +226,6 @@ unlfsr
 8000 tvar high      \ must contain `8000`
 FFFF tvar set       \ all bits set, -1
 
-
   \ These variables, along with some defined in the Forth
   \ code, need to be written to, hampering turning the
   \ Forth interpreter into a Forth ROM. Instead, we could
@@ -248,7 +243,12 @@ FFFF tvar set       \ all bits set, -1
 TERMBUF =buf + constant =tbufend
 
 \ TODO: If we remove the iAND instruction we can replace this
-\ with another LFSR, for up/down counting.
+\ with another LFSR, for up/down counting. If the replacement
+\ function for iADD is quite large, then we could implement
+\ primitive way to call/return from the Addition function,
+\ which would not require a full stack but simply a location
+\ to return to (a single variable). This could be implemented
+\ before iADD is removed, to make sure that is working first.
 : one @1 2/ ;
 : vcell one ;
 : -vcell set 2/ ;
@@ -259,7 +259,8 @@ TERMBUF =buf + constant =tbufend
 
 \ --- ---- ---- ---- Forth VM ---- ---- ---- ---- ---- ---- --- 
 
- : .x $58 iLITERAL set iSTORE ;
+: .x $58 iLITERAL set iSTORE ; \ TEST CODE
+: .y $59 iLITERAL set iSTORE ; \ TEST CODE
 label: start \ Forth VM entry point
   start call  entry t! \ Set entry point
 
@@ -332,8 +333,7 @@ label: .rdrop
 :m :f
   get-current >r target.1 set-current create
   r> set-current talign there ,
-  does> @ thread,
-  ;m
+  does> @ thread, ;m
 
 :m :t ( "name" -- : forth only routine )
   >in @ thead >in !
@@ -543,9 +543,9 @@ assembler.1 -order
 :m : :t ;m
 :m ; ;t ;m
 :h #1 1 lit ;t ( --  1 : push  1 onto variable stack )
-:h #-1 -1 lit ;t
+:h #-1 -1 lit ;t ( -- -1: push -1 onto variable stack )
 :to + + ;t ( n n -- n )
-: 1- #-1 + ;
+: 1- #-1 + ; ( u -- u )
 : invert #-1 xor ; ( u -- u )
 : negate 1- invert ; ( n -- n : negate [twos compliment] )
 : - negate + ;       ( u u -- u : subtract )
@@ -864,7 +864,7 @@ hvar #h          ( -- a : dictionary pointer )
 : eval ( -- )
    begin bl word dup c@ while
    interpret #1 ?depth repeat drop ."  ok" cr ;
-:h ini hex postpone [ #0 in! #-1 dpl ! ; ( -- )
+:h ini hex  postpone [ #0 in! #-1 dpl ! ; ( -- )
 : info ( -- )
   cr
   ." Project: eForth Interpreter" cr
@@ -893,5 +893,3 @@ save-target lfsr.bin
 
 .( DONE ) cr
 bye
-
-

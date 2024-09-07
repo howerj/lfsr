@@ -12,7 +12,7 @@
 #endif
 
 #ifndef COUNT
-#define COUNT (1)
+#define COUNT (2)
 #endif
 
 #if COUNT == 0
@@ -25,7 +25,6 @@
 #define POLY (0xB8)
 #define PERIOD (255)
 #endif
-
 
 typedef struct {
 	uint16_t m[SZ], pc, a;
@@ -67,20 +66,22 @@ static inline void store(vm_t *v, uint16_t addr, uint16_t val) {
 static int run(vm_t *v) {
 	assert(v);
 	uint16_t pc = v->pc, a = v->pc, *m = v->m; /* load machine state */
-	for (;;) { // TODO: Might be able to reduce LFSR state to 9-bit? (511 values for maximal period)
+	for (;;) { 
+		// TODO: Might be able to reduce LFSR state to 9-bit? (511 values for maximal period)
+		// TODO: Turn top bit into indirection bit
 		const uint16_t ins = m[pc % SZ];
 		const uint16_t imm = ins & 0xFFF;
 		const uint16_t alu = (ins >> 12) & 0xF;
 		const uint16_t _pc = next(v, pc);
 		if (v->debug && fprintf(v->debug, "%04x:%04X %04X\n", (unsigned)pc, (unsigned)ins, (unsigned)a) < 0) return -1;
-		switch (alu) { // TODO: Reorganize instruction set
+		switch (alu) { // TODO: Reorganize instruction set (OR Should be 0 for NOP)
 		case 0: a = load(v, imm); pc = _pc; break;
 		case 1: a = load(v, imm); a = load(v, a); pc = _pc; break;
 		case 2: store(v, load(v, imm), a); pc = _pc; break;
 		case 4: store(v, imm, a); pc = _pc; break;
 
 		case 5: a += load(v, imm); pc = _pc; break; // TODO: Remove addition, replace with `a <<= 1`
-		case 7: a &= load(v, imm); pc = _pc; break;
+		case 7: a &= load(v, imm); pc = _pc; break; // TODO: Remove one logical operator (either OR or XOR)
 		case 8: a |= load(v, imm); pc = _pc; break;
 		case 9: a ^= load(v, imm); pc = _pc; break;
 		case 10: a >>= 1; pc = _pc; break;
@@ -88,6 +89,7 @@ static int run(vm_t *v) {
 		case 11: if (pc == imm) goto end; pc = imm; break;
 		case 12: pc = _pc; if (!a) pc = imm; break;
 		case 15: pc = load(v, imm); break;
+		// TODO: Add JUMPZ indirect
 
 		case 3: a = imm; pc = _pc; break; // TODO: Remove?
 		case 6: pc = _pc; break;
