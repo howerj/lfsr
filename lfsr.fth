@@ -55,26 +55,67 @@
 \        #include <stdio.h>
 \        
 \        static int Add(int a, int b) {
-\        	while (b) {
-\        		int carry = a & b;
-\        		a = a ^ b;
-\        		b = carry << 1;
-\        	}
-\        	return a;
+\          while (b) {
+\            int carry = a & b;
+\            a = a ^ b;
+\            b = carry << 1;
+\          }
+\          return a;
 \        }
 \        
 \        int main(int argc, char **argv) {
-\        	if (argc != 3) {
-\        		(void)fprintf(stderr, 
-\        		"Usage: %s number number\n", argv[0]);
-\        		return 1;
-\        	}
-\        	const int a = atoi(argv[1]);
-\        	const int b = atoi(argv[2]);
-\        	const int c = Add(a, b);
-\        	return fprintf(stdout, "%d + %d = %d\n", 
-\        		a, b, c) < 0 ? 1 : 0;
+\          if (argc != 3) {
+\            (void)fprintf(stderr, 
+\            "Usage: %s number number\n", argv[0]);
+\            return 1;
+\          }
+\          const int a = atoi(argv[1]);
+\          const int b = atoi(argv[2]);
+\          const int c = Add(a, b);
+\          return fprintf(stdout, "%d + %d = %d\n", 
+\            a, b, c) < 0 ? 1 : 0;
 \        }
+\
+\ And this code shows how an LFSR can count up, and down,
+\ just for reference:
+\
+\        #include <stdio.h>
+\        #include <stdint.h>
+\        
+\        /* Alternatives: 0x240/0x081/Period 1023/10bits, 
+\         * and 0x110/0x021/Period 511/9 bits */
+\        #define POLY (0xB8) 
+\        #define REV  (0x71)
+\        #define PERIOD (255)
+\        #define BITS (8)
+\        
+\        static uint16_t lfsr(uint16_t lfsr, uint16_t poly) {
+\          int feedback = lfsr & 1;
+\          lfsr >>= 1;
+\          if (feedback)
+\            lfsr ^= poly;
+\          return lfsr;
+\        }
+\        
+\        static uint16_t rlfsr(uint16_t lfsr, uint16_t poly) {
+\          int feedback = lfsr & (1 << (BITS - 1));
+\          lfsr <<= 1;
+\          if (feedback)
+\            lfsr ^= poly;
+\          return lfsr % (PERIOD + 1); /* Mod LFSR length */
+\        }
+\        
+\        int main(void) {
+\          uint16_t s = 1, r = 1;
+\          for (int i = 0; i <= PERIOD; i++) {
+\            if (fprintf(stdout, "%x %x\n", s,r) < 0) return 1;
+\            s = lfsr(s, POLY);
+\            r = rlfsr(r, REV); 
+\          }
+\          return 0;
+\        }
+\        
+\ Now on to the eForth interpreter.
 
 only forth also definitions hex
 
@@ -123,6 +164,8 @@ $FF constant period
   swap 1 rshift swap ( state /= 2 )
   if polynomial xor then ; ( xor in poly if feedback set )
 : pc++ pc @ lfsr pc ! ;
+: ordering 1 period for dup u. lfsr  next drop cr ;
+\ ordering
 
 : :m meta.1 +order also definitions : ;
 : ;m postpone ; ; immediate
@@ -299,6 +342,7 @@ assembler.1 +order
   t iLOAD         \ load current instruction
 \ TODO: This iADD can be removed if we jump on some higher bits
 \ being set, if iADD instruction is removed
+\ TODO: Try to use indirect conditional jump?
 primitive 2/ iADD \ subtract location (primitive is negated)
 high 2/ iAND      \ is high bit set?
   if              \ yes: must be instruction
