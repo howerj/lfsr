@@ -1,14 +1,19 @@
-CFLAGS=-Wall -Wextra -O3 -std=c99 -pedantic
+CFLAGS=-Wall -Wextra -pedantic -std=c99 -O2
+IMAGE=lfsr.hex
+TARGET=lfsr
 
-.PHONY: all run clean
+.PHONY: run clean
 
-all: lfsr
+run: ${TARGET} ${IMAGE}
+	./${TARGET} ${IMAGE}
 
-run: lfsr lfsr.hex
-	./lfsr lfsr.hex
+${TARGET}.hex: ${TARGET}.fth
+	gforth ${TARGET}.fth
 
-lfsr.hex: lfsr.fth
-	gforth $<
+${TARGET}: ${TARGET}.c
+
+${TARGET}.tgz: ${TARGET}.md ${TARGET}.c ${TARGET}.hex
+	tar zvcf $@ $^
 
 clean:
 	git clean -dffx

@@ -19,9 +19,11 @@ Using a LFSR is quite a good choice when gates are at a premium and the counter
 value does not have to be visible to a user of it (such as a delay counter, or
 a counter for a stack).
 
+Note that because of the pedigree of this Forth 
+
 # To Do / Notes
 
-* Jump to zero would indicate a halt, alternatively it might need to contain a
+* Jump to zero could indicate a halt, alternatively it might need to contain a
   `jump-to-1` instruction, which would take care of the self starting problem.
 * If we have 64 Kibi Words of memory, then instead of a LFSR that can address
   most of that memory (0xD008) we should use only one that can address the

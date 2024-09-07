@@ -74,27 +74,27 @@ static int run(vm_t *v) {
 		const uint16_t alu = (ins >> 12) & 0xF;
 		const uint16_t _pc = next(v, pc);
 		if (v->debug && fprintf(v->debug, "%04x:%04X %04X\n", (unsigned)pc, (unsigned)ins, (unsigned)a) < 0) return -1;
-		switch (alu) { // TODO: Reorganize instruction set (OR Should be 0 for NOP)
-		case 0: a = load(v, imm); pc = _pc; break;
-		case 1: a = load(v, imm); a = load(v, a); pc = _pc; break;
-		case 2: store(v, load(v, imm), a); pc = _pc; break;
-		case 4: store(v, imm, a); pc = _pc; break;
+		switch (alu) {
+		case 0: a |= load(v, imm); pc = _pc; break;
+		case 1: a &= load(v, imm); pc = _pc; break; // TODO: Remove one logical operator (either OR or XOR)
+		case 2: a ^= load(v, imm); pc = _pc; break;
+		case 3: a >>= 1; pc = _pc; break;
 
-		case 5: a += load(v, imm); pc = _pc; break; // TODO: Remove addition, replace with `a <<= 1`
-		case 7: a &= load(v, imm); pc = _pc; break; // TODO: Remove one logical operator (either OR or XOR)
-		case 8: a |= load(v, imm); pc = _pc; break;
-		case 9: a ^= load(v, imm); pc = _pc; break;
-		case 10: a >>= 1; pc = _pc; break;
+		case 4: a = load(v, imm); pc = _pc; break;
+		case 5: a = load(v, imm); a = load(v, a); pc = _pc; break;
+		case 6: store(v, imm, a); pc = _pc; break;
+		case 7: store(v, load(v, imm), a); pc = _pc; break;
 
-		case 11: if (pc == imm) goto end; pc = imm; break;
-		case 12: pc = _pc; if (!a) pc = imm; break;
-		case 15: pc = load(v, imm); break;
-		// TODO: Add JUMPZ indirect
+		case 8: if (pc == imm) goto end; pc = imm; break; /* `goto end` for testing only */
+		case 9: pc = load(v, imm); break;
+		case 10: pc = _pc; if (!a) pc = imm; break;
+		case 11: pc = _pc; if (!a) pc = load(v, imm); break;
 
-		case 3: a = imm; pc = _pc; break; // TODO: Remove?
-		case 6: pc = _pc; break;
-		case 13: pc = _pc; break;
+		case 12: a += load(v, imm); pc = _pc; break; // TODO: Remove addition, replace with `a <<= 1`
+
+		case 13: pc = _pc; break; 
 		case 14: pc = _pc; break;
+		case 15: pc = _pc; break;
 		}
 	}
 end:

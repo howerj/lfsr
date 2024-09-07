@@ -27,6 +27,7 @@
 \ - <https://github.com/samawati/j1eforth>
 \ - <https://www.bradrodriguez.com/papers/>
 \ - <https://github.com/howerj/subleq>
+\ - <https://github.com/howerj/7400>
 \ - 8086 eForth 1.0 by Bill Muench and C. H. Ting, 1990
 \
 \ For a more feature complete eForth see:
@@ -48,6 +49,32 @@
 \ `vm.hex`) should be available if you do not have gforth 
 \ installed.
 \
+\ This code can be used to perform addition:        
+\        
+\        #include <stdlib.h>
+\        #include <stdio.h>
+\        
+\        static int Add(int a, int b) {
+\        	while (b) {
+\        		int carry = a & b;
+\        		a = a ^ b;
+\        		b = carry << 1;
+\        	}
+\        	return a;
+\        }
+\        
+\        int main(int argc, char **argv) {
+\        	if (argc != 3) {
+\        		(void)fprintf(stderr, 
+\        		"Usage: %s number number\n", argv[0]);
+\        		return 1;
+\        	}
+\        	const int a = atoi(argv[1]);
+\        	const int b = atoi(argv[2]);
+\        	const int c = Add(a, b);
+\        	return fprintf(stdout, "%d + %d = %d\n", 
+\        		a, b, c) < 0 ? 1 : 0;
+\        }
 
 only forth also definitions hex
 
@@ -88,16 +115,10 @@ size =cell - tep !
 0 tlast !
 
 variable pc 1 pc !
-\ $240 constant polynomial
-\ $3FF constant period
-
-\ $110 constant polynomial
-\ $1FF constant period
-
 $B8 constant polynomial
 $FF constant period
 
-: lfsr 
+: lfsr ( state -- state )
   dup 1 and ( mask off feed back )
   swap 1 rshift swap ( state /= 2 )
   if polynomial xor then ; ( xor in poly if feedback set )
@@ -173,32 +194,31 @@ $FF constant period
 :m tv' t' >tbody ;m ( address of variable )
 :m t2/ 2/ ;m
 :m t2* 2* ;m
-:m unlfsr period 2* there - 2* tallot ;m \ TODO: Why 2*?
+:m unlfsr period 2* there + tallot ;m
 :m pc, pc @ 2* t! pc++ ;m
-: .m .s cr ;m
 
-: iLOAD-C  2/ 0000 or pc, ; \ Store address
-: iLOAD    2/ 1000 or pc, ;
-: iSTORE   2/ 2000 or pc, ;
-: iLITERAL    3000 or pc, ; \ Load 12-bit literal into accm
-: iSTORE-C 2/ 4000 or pc, ; \ Load address
-: iADD     5000 or pc, ;
-: iNOP1    6000 or pc, ;
-: iAND     7000 or pc, ;
-: iOR      8000 or pc, ;
-: iXOR     9000 or pc, ;
-: iRSHIFT  A000 pc, ;
-: iJUMP    B000 or pc, ; \ Unconditional jump
-: iJUMPZ   C000 or pc, ; \ Conditional Jump!
-: iNOP2    D000 or pc, ;
-: iNOP3    E000 or pc, ;
-: iPC!     F000 or pc, ;
+: iOR      0000 or pc, ;
+: iAND     1000 or pc, ;
+: iXOR     2000 or pc, ;
+: iRSHIFT  3000 pc, ; \ RSHIFT only by 1 place
+: iLOAD-C  2/ 4000 or pc, ; \ Load immediate
+: iLOAD    2/ 5000 or pc, ; \ Load through immediate
+: iSTORE-C 2/ 6000 or pc, ; \ Store acc to imm location
+: iSTORE   2/ 7000 or pc, ; \ Load imm location, store to that
+: iJUMP    8000 or pc, ; \ Unconditional jump
+: iPC!     9000 or pc, ; \ Indirect Jump
+: iJUMPZ   A000 or pc, ; \ Conditional Jump!
+: iPC!Z    B000 or pc, ; \ Indirect Conditional Jump!
+: iADD     C000 or pc, ;
+: iNOP0 D000 or pc, ;
+: iNOP1 E000 or pc, ;
+: iNOP2 F000 or pc, ;
 
 : branch 2/ iJUMP ;
 : ?branch 2/ iJUMPZ ;
 : call 2/ ( iJUMP -> ) B000 or ;
 : thread 2/ ;
-: thread, thread t, ; \ TODO: Fix?
+: thread, thread t, ;
 :m postpone t' thread, ;m
 
 assembler.1 +order also definitions
@@ -224,6 +244,7 @@ unlfsr
    \ Constants not variables
    1 tvar @1        \ must contain `1`
 8000 tvar high      \ must contain `8000`
+\ FFF0 tvar ins       \ must contain `FFF0`
 FFFF tvar set       \ all bits set, -1
 
   \ These variables, along with some defined in the Forth
@@ -258,9 +279,6 @@ TERMBUF =buf + constant =tbufend
 : ++rp {rp} iLOAD-C  vcell iADD {rp} iSTORE-C ;
 
 \ --- ---- ---- ---- Forth VM ---- ---- ---- ---- ---- ---- --- 
-
-: .x $58 iLITERAL set iSTORE ; \ TEST CODE
-: .y $59 iLITERAL set iSTORE ; \ TEST CODE
 label: start \ Forth VM entry point
   start call  entry t! \ Set entry point
 
@@ -531,11 +549,7 @@ a: (key) ( -- u )
   tos iSTORE-C
   a;
 
-\ there .( MEMORY USED FOR VM ) . cr
-
-\ unlfsr
-period 1+ t2* negate primitive t!
-\ there t2/ negate primitive t! \ Forth code after this
+period 1+ negate primitive t!
 \ --- ---- ---- ---- no more direct assembly ---- ---- ---- --- 
 
 assembler.1 -order
@@ -869,7 +883,7 @@ hvar #h          ( -- a : dictionary pointer )
   cr
   ." Project: eForth Interpreter" cr
   ." Author:  Richard James Howe" cr
-  ." License: MIT / Public Domain" cr
+  ." License: 0BSD / Public Domain" cr
   ." Email:   howe.r.j.89@gmail.com" cr ;
 : quit ( -- : interpreter loop [and more] )
   there t2/ <cold> t! \ program entry point set here
@@ -893,3 +907,4 @@ save-target lfsr.bin
 
 .( DONE ) cr
 bye
+

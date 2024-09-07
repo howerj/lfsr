@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 #ifndef COUNT
-#define COUNT 1
+#define COUNT 2
 #endif
 
 #if COUNT == 0
