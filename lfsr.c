@@ -6,25 +6,8 @@
 #include <assert.h>
 
 #define SZ (0x2000)
-
-#ifndef MODE
-#define MODE  (1)
-#endif
-
-#ifndef COUNT
-#define COUNT (2)
-#endif
-
-#if COUNT == 0
-#define POLY (0x240)
-#define PERIOD (1023)
-#elif COUNT == 1
-#define POLY (0x110)
-#define PERIOD (511)
-#elif COUNT == 2
 #define POLY (0xB8)
 #define PERIOD (255)
-#endif
 
 typedef struct {
 	uint16_t m[SZ], pc, a;
@@ -34,7 +17,7 @@ typedef struct {
 	FILE *debug;
 } vm_t;
 
-static uint16_t lfsr(uint16_t lfsr, uint16_t polynomial_mask) {
+static uint8_t lfsr(uint8_t lfsr, uint8_t polynomial_mask) {
 	int feedback = lfsr & 1;
 	lfsr >>= 1;
 	if (feedback)
@@ -42,16 +25,14 @@ static uint16_t lfsr(uint16_t lfsr, uint16_t polynomial_mask) {
 	return lfsr;
 }
 
-static inline uint16_t next(vm_t *v, uint16_t pc) {
+static inline uint8_t next(vm_t *v, uint8_t pc) {
 	assert(v);
-	if (MODE == 0)
-		return pc + 1;
 	return lfsr(pc, POLY);
 }
 
 static inline uint16_t load(vm_t *v, uint16_t addr) {
 	assert(v);
-	if (addr & 0x8000)
+	if (addr & 0x8000) /* more peripherals could be added if needed */
 		return v->get(v->in);
 	return v->m[addr % SZ];
 }
@@ -66,12 +47,11 @@ static inline void store(vm_t *v, uint16_t addr, uint16_t val) {
 static int run(vm_t *v) {
 	assert(v);
 	uint16_t pc = v->pc, a = v->pc, *m = v->m; /* load machine state */
-	for (;;) { 
-		// TODO: Turn top bit into indirection bit
+	for (;;) { /* TODO: Turn top bit into indirection bit */
 		const uint16_t ins = m[pc % SZ];
 		const uint16_t imm = ins & 0xFFF;
 		const uint16_t alu = (ins >> 12) & 0xF;
-		const uint16_t _pc = next(v, pc);
+		const uint8_t _pc = next(v, pc);
 		if (v->debug && fprintf(v->debug, "%04x:%04X %04X\n", (unsigned)pc, (unsigned)ins, (unsigned)a) < 0) return -1;
 		switch (alu) {
 		case 0: a |= load(v, imm); pc = _pc; break;

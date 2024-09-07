@@ -155,6 +155,7 @@ variable tlast
 size =cell - tep !
 0 tlast !
 
+variable vms 0 vms !
 variable pc 1 pc !
 $B8 constant polynomial
 $FF constant period
@@ -163,9 +164,14 @@ $FF constant period
   dup 1 and ( mask off feed back )
   swap 1 rshift swap ( state /= 2 )
   if polynomial xor then ; ( xor in poly if feedback set )
-: pc++ pc @ lfsr pc ! ;
+: pc++ pc @ lfsr pc ! 1 vms +! ;
 : ordering 1 period for dup u. lfsr  next drop cr ;
-\ ordering
+: vmused 
+  ." poly> " polynomial u. cr
+  ." period> " period u. cr
+  ." vm used> 0x" vms @ dup u. 
+  ." / 0x" 2* u. ." bytes" cr ;
+ordering
 
 : :m meta.1 +order also definitions : ;
 : ;m postpone ; ; immediate
@@ -259,7 +265,7 @@ $FF constant period
 
 : branch 2/ iJUMP ;
 : ?branch 2/ iJUMPZ ;
-: call 2/ ( iJUMP -> ) B000 or ;
+: call 2/ ( iJUMP -> ) 8000 or ;
 : thread 2/ ;
 : thread, thread t, ;
 :m postpone t' thread, ;m
@@ -279,7 +285,7 @@ meta.1 +order also definitions
 
 \ --- ---- ---- ---- image generation   ---- ---- ---- ---- --- 
 
-B001 t,  \ halt condition of VM, we start at next address
+8001 t,  \ halt condition of VM, we start at next address
 label: entry ( previous instructions are irrelevant )
 0 pc,  \ entry point of VM
 unlfsr
@@ -322,7 +328,7 @@ TERMBUF =buf + constant =tbufend
 
 \ --- ---- ---- ---- Forth VM ---- ---- ---- ---- ---- ---- --- 
 label: start \ Forth VM entry point
-  start call  entry t! \ Set entry point
+  start call entry t! \ Set entry point
 
   {sp0} iLOAD-C {sp} iSTORE-C \ Set initial v.stk ptr
   {rp0} iLOAD-C {rp} iSTORE-C \ Set initial r.stk ptr
@@ -586,6 +592,7 @@ a: (key) ( -- u )
   tos iSTORE-C
   a;
 
+vmused
 \ There should be no more than 255 cells used by the previous
 \ virtual machine, if more are used a different polynomial
 \ for the LFSR must be used, along with a different instruction
