@@ -286,8 +286,7 @@ unlfsr
 
    \ Constants not variables
    1 tvar @1        \ must contain `1`
-8000 tvar high      \ must contain `8000`
-\ FFF0 tvar ins       \ must contain `FFF0`
+FF00 tvar ins       \ instruction mask
 FFFF tvar set       \ all bits set, -1
 
   \ These variables, along with some defined in the Forth
@@ -298,8 +297,8 @@ FFFF tvar set       \ all bits set, -1
    0 tvar <cold>    \ entry point of virtual machine, set later
    0 tvar ip        \ instruction pointer
    0 tvar t         \ temporary register
+   0 tvar q         \ second, temporary register
    0 tvar tos       \ top of stack
-   0 tvar primitive \ VM/Forth code divider
  =end              dup tvar {sp0} tvar {sp} \ grows downwards
  =end =stksz 2* -  dup tvar {rp0} tvar {rp} \ grows upwards
  =end =stksz 2* - =buf - constant TERMBUF \ pad buffer space
@@ -340,22 +339,16 @@ assembler.1 +order
   one iADD        \ increment ptr to next instruction
   ip iSTORE-C     \ `ip` points to the next instruction
   t iLOAD         \ load current instruction
-\ TODO: This iADD can be removed if we jump on some higher bits
-\ being set, if iADD instruction is removed
-\ TODO: Try to use indirect conditional jump?
-primitive 2/ iADD \ subtract location (primitive is negated)
-high 2/ iAND      \ is high bit set?
-  if              \ yes: must be instruction
-    t iLOAD       \ load current instruction, again
-    t iSTORE-C    \ Store it back to `t`
-    t 2/ iPC!     \ jump to VM instruction
-  then \ no: must be another Forth word to call
+  q iSTORE-C      \ Store result to `q`
+  ins 2/ iAND     \ Mask off high bits
+  q 2/ iPC!Z      \ Conditional Jump indirect through `q`
   ++rp            \ increment return stack pointer
   ip iLOAD-C      \ load location of next instruction
   {rp} iSTORE     \ store return location
-  t iLOAD         \ load through current instruction pointer
+  q iLOAD-C       \ load instruction again
   ip iSTORE-C     \ store it `ip`, completing call
   vm branch       \ and do it all again!
+
 assembler.1 -order
 \ Note that as the entire address space is unlikely to be
 \ used we could use some of the addresses high bits for
@@ -593,7 +586,11 @@ a: (key) ( -- u )
   tos iSTORE-C
   a;
 
-period 1+ negate primitive t!
+\ There should be no more than 255 cells used by the previous
+\ virtual machine, if more are used a different polynomial
+\ for the LFSR must be used, along with a different instruction
+\ mask.
+\
 \ --- ---- ---- ---- no more direct assembly ---- ---- ---- --- 
 
 assembler.1 -order

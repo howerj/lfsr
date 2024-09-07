@@ -12,7 +12,7 @@ ${TARGET}.hex: ${TARGET}.fth
 
 ${TARGET}: ${TARGET}.c
 
-${TARGET}.tgz: ${TARGET}.md ${TARGET}.c ${TARGET}.hex
+${TARGET}.tgz: readme.md ${TARGET}.c ${TARGET}.hex
 	tar zvcf $@ $^
 
 clean:

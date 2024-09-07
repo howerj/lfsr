@@ -67,7 +67,6 @@ static int run(vm_t *v) {
 	assert(v);
 	uint16_t pc = v->pc, a = v->pc, *m = v->m; /* load machine state */
 	for (;;) { 
-		// TODO: Might be able to reduce LFSR state to 9-bit? (511 values for maximal period)
 		// TODO: Turn top bit into indirection bit
 		const uint16_t ins = m[pc % SZ];
 		const uint16_t imm = ins & 0xFFF;
