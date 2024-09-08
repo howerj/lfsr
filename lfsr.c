@@ -54,9 +54,9 @@ static int run(vm_t *v) {
 		const uint8_t _pc = next(v, pc);
 		if (v->debug && fprintf(v->debug, "%04x:%04X %04X\n", (unsigned)pc, (unsigned)ins, (unsigned)a) < 0) return -1;
 		switch (alu) {
-		case 0: a |= load(v, imm); pc = _pc; break;
-		case 1: a &= load(v, imm); pc = _pc; break; // TODO: Remove one logical operator (either OR or XOR)
-		case 2: a ^= load(v, imm); pc = _pc; break;
+		case 0: a &= load(v, imm); pc = _pc; break;
+		case 1: a ^= load(v, imm); pc = _pc; break;
+		case 2: a <<= 1; pc = _pc; break; 
 		case 3: a >>= 1; pc = _pc; break;
 
 		case 4: a = load(v, imm); pc = _pc; break;
@@ -71,7 +71,7 @@ static int run(vm_t *v) {
 
 		case 12: a += load(v, imm); pc = _pc; break; // TODO: Remove addition
 
-		case 13: a <<= 1; pc = _pc; break; 
+		case 13: pc = _pc; break; 
 		case 14: pc = _pc; break;
 		case 15: pc = _pc; break;
 		}

@@ -251,9 +251,9 @@ ordering cr
 
 : jump-val 8000 ;
 
-: iOR      0000 or pc, ;
-: iAND     1000 or pc, ;
-: iXOR     2000 or pc, ;
+: iAND     0000 or pc, ;
+: iXOR     1000 or pc, ;
+: iLSHIFT  2000 pc, ; \ LSHIFT only be 1 place
 : iRSHIFT  3000 pc, ; \ RSHIFT only by 1 place
 : iLOAD-C  2/ 4000 or pc, ; \ Load immediate
 : iLOAD    2/ 5000 or pc, ; \ Load through immediate
@@ -264,7 +264,7 @@ ordering cr
 : iJUMPZ   A000 or pc, ; \ Conditional Jump!
 : iPC!Z    B000 or pc, ; \ Indirect Conditional Jump!
 : iADD     C000 or pc, ;
-: iLSHIFT  D000 pc, ; \ LSHIFT only be 1 place
+: iNOP0 D000 or pc, ;
 : iNOP1 E000 or pc, ;
 : iNOP2 F000 or pc, ;
 
@@ -383,10 +383,10 @@ assembler.1 -order
   assembler.1 -order ;m
 :m a; (a); vm branch ;m
 
-\ $58 tvar (x)
-\    (x) iLOAD-C set iSTORE
+\ TODO: When implementing stacks using LFSR we can use XOR
+\ to to mask off the low bits of a pointer, and then XOR
+\ to put in the next sequence
 
-\ TODO: Turn into macros, and functions
 a: +lfsr
   tos iLOAD-C
   one iAND
@@ -542,12 +542,6 @@ a: add \ TODO: Turn into macro
   decSp branch
   (a);
 
-a: or ( u u -- u : bit wise OR )
-  {sp} iLOAD
-  tos 2/ iOR
-  decSp branch
-  (a);
-
 a: xor ( u u -- u : bit wise XOR )
   {sp} iLOAD
   tos 2/ iXOR
@@ -694,7 +688,6 @@ FF hconst #ff  ( -- 255 : space saving measure, push `255` )
  2 constant cell ( -- u: size of memory cell in bytes )
 :to bye bye ; ( -- )
 :to and and ; ( u u -- u )
-:to or or ; ( u u -- u )
 :to xor xor ; ( u u -- u )
 :to @ @ ; ( a -- u )
 :to ! ! ; ( u a -- )
@@ -706,6 +699,7 @@ FF hconst #ff  ( -- 255 : space saving measure, push `255` )
 :to add add ;
 :h sp@ {sp} lit @ :f 1+ #1 + ; ( -- u )
 :h rp@ {rp} lit @ 1- ; ( -- u )
+: or invert swap invert and invert ;
 : execute 2/ >r ; ( xt -- )
 : 0= if #0 exit then #-1 ; ( u -- f )
 :h bit #1 and ;
