@@ -69,9 +69,9 @@ static int run(vm_t *v) {
 		case 10: pc = _pc; if (!a) pc = imm; break;
 		case 11: pc = _pc; if (!a) pc = load(v, imm); break;
 
-		case 12: a += load(v, imm); pc = _pc; break; // TODO: Remove addition, replace with `a <<= 1`
+		case 12: a += load(v, imm); pc = _pc; break; // TODO: Remove addition
 
-		case 13: pc = _pc; break; 
+		case 13: a <<= 1; pc = _pc; break; 
 		case 14: pc = _pc; break;
 		case 15: pc = _pc; break;
 		}

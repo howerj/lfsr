@@ -158,23 +158,28 @@ size =cell - tep !
 variable vms 0 vms !
 variable pc 1 pc !
 $B8 constant polynomial
+$71 constant -polynomial
 $FF constant period
-
-: lfsr ( state -- state )
-  dup 1 and ( mask off feed back )
-  swap 1 rshift swap ( state /= 2 )
-  if polynomial xor then ; ( xor in poly if feedback set )
-: pc++ pc @ lfsr pc ! 1 vms +! ;
-: ordering 1 period for dup u. lfsr  next drop cr ;
-: vmused 
-  ." poly> " polynomial u. cr
-  ." period> " period u. cr
-  ." vm used> 0x" vms @ dup u. 
-  ." / 0x" 2* u. ." bytes" cr ;
-ordering
 
 : :m meta.1 +order also definitions : ;
 : ;m postpone ; ; immediate
+:m .h base @ >r hex     u. r> base ! ;m
+:m .d base @ >r decimal u. r> base ! ;m
+
+:m lfsr ( state -- state )
+  dup 1 and ( mask off feed back )
+  swap 1 rshift swap ( state /= 2 )
+  if polynomial xor then ;m ( xor in poly if feedback set )
+:m pc++ pc @ lfsr pc ! 1 vms +! ;m
+:m ordering 1 period for dup u. lfsr  next drop cr ;m
+:m vmused 
+  ." poly> $" polynomial u. cr
+  ." period> $" period u. cr
+  ." vm used> " vms @ dup .d 
+  ." cells / " 2* .d ." bytes" cr ;m
+.( Polynomial sequence: ) cr
+ordering cr
+
 :m there tdp @ ;m
 :m tc! tflash + c! ;m
 :m tc@ tflash + c@ ;m
@@ -212,8 +217,6 @@ ordering
 :m save-target ( <name> -- )
   parse-word w/o create-file throw >r
    tflash there r@ write-file throw r> close-file ;m
-:m .h base @ >r hex     u. r> base ! ;m
-:m .d base @ >r decimal u. r> base ! ;m
 :m twords ( -- : print out words in target dictionary )
    cr tlast @
    begin
@@ -226,7 +229,7 @@ ordering
     ." assembler: "   assembler.1   +order words cr cr
     ." meta: "        meta.1        +order words cr cr
   then
-  ." used> " there dup ." 0x" .h ." / " .d cr ;m
+  ." used> " there dup ." $" .h ." / " .d cr ;m
 :m .end only forth also definitions decimal ;m
 :m atlast tlast @ ;m
 :m tvar   get-current >r meta.1 set-current 
@@ -246,6 +249,8 @@ ordering
 :m unlfsr period 2* there + tallot ;m
 :m pc, pc @ 2* t! pc++ ;m
 
+: jump-val 8000 ;
+
 : iOR      0000 or pc, ;
 : iAND     1000 or pc, ;
 : iXOR     2000 or pc, ;
@@ -254,18 +259,18 @@ ordering
 : iLOAD    2/ 5000 or pc, ; \ Load through immediate
 : iSTORE-C 2/ 6000 or pc, ; \ Store acc to imm location
 : iSTORE   2/ 7000 or pc, ; \ Load imm location, store to that
-: iJUMP    8000 or pc, ; \ Unconditional jump
+: iJUMP    jump-val or pc, ; \ Unconditional jump
 : iPC!     9000 or pc, ; \ Indirect Jump
 : iJUMPZ   A000 or pc, ; \ Conditional Jump!
 : iPC!Z    B000 or pc, ; \ Indirect Conditional Jump!
 : iADD     C000 or pc, ;
-: iNOP0 D000 or pc, ;
+: iLSHIFT  D000 pc, ; \ LSHIFT only be 1 place
 : iNOP1 E000 or pc, ;
 : iNOP2 F000 or pc, ;
 
 : branch 2/ iJUMP ;
 : ?branch 2/ iJUMPZ ;
-: call 2/ ( iJUMP -> ) 8000 or ;
+: call 2/ ( iJUMP -> ) jump-val or ;
 : thread 2/ ;
 : thread, thread t, ;
 :m postpone t' thread, ;m
@@ -285,7 +290,7 @@ meta.1 +order also definitions
 
 \ --- ---- ---- ---- image generation   ---- ---- ---- ---- --- 
 
-8001 t,  \ halt condition of VM, we start at next address
+jump-val 1 or t,  \ halt condition of VM, we start at next address
 label: entry ( previous instructions are irrelevant )
 0 pc,  \ entry point of VM
 unlfsr
@@ -294,6 +299,10 @@ unlfsr
    1 tvar @1        \ must contain `1`
 FF00 tvar ins       \ instruction mask
 FFFF tvar set       \ all bits set, -1
+polynomial tvar poly
+-polynomial tvar -poly
+$80 tvar polhi
+$FF tvar polmsk
 
   \ These variables, along with some defined in the Forth
   \ code, need to be written to, hampering turning the
@@ -304,6 +313,7 @@ FFFF tvar set       \ all bits set, -1
    0 tvar ip        \ instruction pointer
    0 tvar t         \ temporary register
    0 tvar q         \ second, temporary register
+   0 tvar w         \ tertiary register
    0 tvar tos       \ top of stack
  =end              dup tvar {sp0} tvar {sp} \ grows downwards
  =end =stksz 2* -  dup tvar {rp0} tvar {rp} \ grows upwards
@@ -372,6 +382,39 @@ assembler.1 -order
 :m (a); CAFED00D <> if abort" unstructured" then 
   assembler.1 -order ;m
 :m a; (a); vm branch ;m
+
+\ $58 tvar (x)
+\    (x) iLOAD-C set iSTORE
+
+\ TODO: Turn into macros, and functions
+a: +lfsr
+  tos iLOAD-C
+  one iAND
+  t iSTORE-C
+  tos iLOAD-C
+  iRSHIFT
+  tos iSTORE-C
+  t iLOAD-C if
+    tos iLOAD-C
+    poly 2/ iXOR
+    tos iSTORE-C
+  then
+  a;
+
+a: -lfsr
+  tos iLOAD-C
+  polhi 2/ iAND
+  t iSTORE-C
+  tos iLOAD-C
+  iLSHIFT
+  tos iSTORE-C
+  t iLOAD-C if
+    tos iLOAD-C
+    -poly 2/ iXOR
+    polmsk 2/ iAND
+    tos iSTORE-C
+  then
+  a;
 
 a: exit ( -- : exit from current function ) 
 label: {unnest} ( return from function call )
@@ -474,6 +517,29 @@ a: and ( u u -- u : bit wise AND )
   {sp} iLOAD
   tos 2/ iAND
 label: decSp tos iSTORE-C --sp vm branch
+  (a);
+
+a: add \ TODO: Turn into macro
+  tos iLOAD-C
+  t iSTORE-C
+  {sp} iLOAD
+  q iSTORE-C
+  label: readd
+    if
+      q iLOAD-C
+      t 2/ iAND
+      w iSTORE-C
+      t iLOAD-C
+      q 2/ iXOR
+      t iSTORE-C
+      w iLOAD-C
+      iLSHIFT
+      q iSTORE-C
+      readd branch 
+    then
+  t iLOAD-C
+  tos iSTORE-C
+  decSp branch
   (a);
 
 a: or ( u u -- u : bit wise OR )
@@ -635,6 +701,9 @@ FF hconst #ff  ( -- 255 : space saving measure, push `255` )
 :to dup dup ; ( u -- u u )
 :to drop drop ; ( u -- )
 :to swap swap ; ( u1 u2 -- u2 u1 )
+:to +lfsr +lfsr ;
+:to -lfsr -lfsr ;
+:to add add ;
 :h sp@ {sp} lit @ :f 1+ #1 + ; ( -- u )
 :h rp@ {rp} lit @ 1- ; ( -- u )
 : execute 2/ >r ; ( xt -- )
@@ -933,6 +1002,7 @@ hvar #h          ( -- a : dictionary pointer )
   ." Author:  Richard James Howe" cr
   ." License: 0BSD / Public Domain" cr
   ." Email:   howe.r.j.89@gmail.com" cr ;
+
 : quit ( -- : interpreter loop [and more] )
   there t2/ <cold> t! \ program entry point set here
   ini
