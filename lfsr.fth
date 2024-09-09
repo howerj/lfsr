@@ -49,7 +49,8 @@
 \ `vm.hex`) should be available if you do not have gforth 
 \ installed.
 \
-\ This code can be used to perform addition:        
+\ This code can be used to perform addition, and is what is
+\ used for the `bitadd` function:
 \        
 \        #include <stdlib.h>
 \        #include <stdio.h>
@@ -249,24 +250,20 @@ ordering cr
 :m unlfsr period 2* there + tallot ;m
 :m pc, pc @ 2* t! pc++ ;m
 
-: jump-val 8000 ;
+: jump-val 6000 ; \ jump instruction value
 
-: iAND     0000 or pc, ;
-: iXOR     1000 or pc, ;
+: iAND     8000 0000 or or pc, ;
+: iXOR     8000 1000 or or pc, ;
 : iLSHIFT  2000 pc, ; \ LSHIFT only be 1 place
 : iRSHIFT  3000 pc, ; \ RSHIFT only by 1 place
 : iLOAD-C  2/ 4000 or pc, ; \ Load immediate
-: iLOAD    2/ 5000 or pc, ; \ Load through immediate
-: iSTORE-C 2/ 6000 or pc, ; \ Store acc to imm location
-: iSTORE   2/ 7000 or pc, ; \ Load imm location, store to that
+: iLOAD    2/ 8000 4000 or or pc, ; \ Load through immediate
+: iSTORE-C 2/ 5000 or pc, ; \ Store acc to imm location
+: iSTORE   2/ 8000 5000 or or pc, ; 
 : iJUMP    jump-val or pc, ; \ Unconditional jump
-: iPC!     9000 or pc, ; \ Indirect Jump
-: iJUMPZ   A000 or pc, ; \ Conditional Jump!
-: iPC!Z    B000 or pc, ; \ Indirect Conditional Jump!
-: iADD     C000 or pc, ;
-: iNOP0 D000 or pc, ;
-: iNOP1 E000 or pc, ;
-: iNOP2 F000 or pc, ;
+: iPC!     8000 jump-val or or pc, ; \ Indirect Jump
+: iJUMPZ   7000 or pc, ; \ Conditional Jump!
+: iPC!Z    8000 7000 or or pc, ; \ Indirect Conditional Jump!
 
 : branch 2/ iJUMP ;
 : ?branch 2/ iJUMPZ ;
@@ -290,19 +287,19 @@ meta.1 +order also definitions
 
 \ --- ---- ---- ---- image generation   ---- ---- ---- ---- --- 
 
-jump-val 1 or t,  \ halt condition of VM, we start at next address
+jump-val 1 or t, \ halt condition of VM, we start at next addr
 label: entry ( previous instructions are irrelevant )
 0 pc,  \ entry point of VM
 unlfsr
 
    \ Constants not variables
-   1 tvar @1        \ must contain `1`
-FF00 tvar ins       \ instruction mask
-FFFF tvar set       \ all bits set, -1
-polynomial tvar poly
--polynomial tvar -poly
-$80 tvar polhi
-$FF tvar polmsk
+   1 tvar @1           \ must contain `1`
+FF00 tvar ins          \ instruction mask
+FFFF tvar set          \ all bits set, -1
+ polynomial tvar  poly \ LFSR poly
+-polynomial tvar -poly \ LFSR reverse poly
+$80 tvar polhi         \ LFSR reverse poly high bit
+$FF tvar polmsk        \ LFSR reverse poly mask
 
   \ These variables, along with some defined in the Forth
   \ code, need to be written to, hampering turning the
@@ -313,28 +310,81 @@ $FF tvar polmsk
    0 tvar ip        \ instruction pointer
    0 tvar t         \ temporary register
    0 tvar q         \ second, temporary register
-   0 tvar w         \ tertiary register
+   0 tvar r0
+   0 tvar r1
+   0 tvar r2
    0 tvar tos       \ top of stack
+   0 tvar rlink      \ link register
  =end              dup tvar {sp0} tvar {sp} \ grows downwards
  =end =stksz 2* -  dup tvar {rp0} tvar {rp} \ grows upwards
  =end =stksz 2* - =buf - constant TERMBUF \ pad buffer space
 
 TERMBUF =buf + constant =tbufend
 
-\ TODO: If we remove the iAND instruction we can replace this
-\ with another LFSR, for up/down counting. If the replacement
-\ function for iADD is quite large, then we could implement
-\ primitive way to call/return from the Addition function,
-\ which would not require a full stack but simply a location
-\ to return to (a single variable). This could be implemented
-\ before iADD is removed, to make sure that is working first.
+:m link 
+   there iLOAD-C
+   rlink iSTORE-C
+   branch
+   pc @ t, ;m
+
+\ $58 tvar xxx : .x xxx iLOAD-C set iSTORE ;
+
+assembler.1 +order
+label: bitadd
+   r1 iLOAD-C
+   if
+     r0 2/ iAND
+     r2 iSTORE-C
+     r0 iLOAD-C
+     r1 2/ iXOR
+     r0 iSTORE-C
+     r2 iLOAD-C
+     iLSHIFT
+     r1 iSTORE-C
+     bitadd branch
+   then
+   r0 iLOAD-C \ Return result in accumulator
+   rlink 2/ iPC!
+
+label: bitinc
+   @1 iLOAD-C
+   r1 iSTORE-C
+   bitadd branch
+
+label: bitdec
+   set iLOAD-C
+   r1 iSTORE-C
+   bitadd branch
+
+label: sp-1
+   {sp} iLOAD-C
+   r0 iSTORE-C
+   bitinc branch
+
+label: sp+1
+   {sp} iLOAD-C
+   r0 iSTORE-C
+   bitdec branch
+
+label: rp-1
+   {rp} iLOAD-C
+   r0 iSTORE-C
+   bitdec branch
+
+label: rp+1
+   {rp} iLOAD-C
+   r0 iSTORE-C
+   bitinc branch
+
+assembler.1 -order
+
 : one @1 2/ ;
 : vcell one ;
 : -vcell set 2/ ;
-: --sp {sp} iLOAD-C  vcell iADD {sp} iSTORE-C ;
-: ++sp {sp} iLOAD-C -vcell iADD {sp} iSTORE-C ;
-: --rp {rp} iLOAD-C -vcell iADD {rp} iSTORE-C ;
-: ++rp {rp} iLOAD-C  vcell iADD {rp} iSTORE-C ;
+: --sp sp-1 link {sp} iSTORE-C ;
+: ++sp sp+1 link {sp} iSTORE-C ;
+: --rp rp-1 link {rp} iSTORE-C ;
+: ++rp rp+1 link {rp} iSTORE-C ;
 
 \ --- ---- ---- ---- Forth VM ---- ---- ---- ---- ---- ---- --- 
 label: start \ Forth VM entry point
@@ -350,9 +400,9 @@ assembler.1 +order
 
   ip iLOAD-C      \ load `ip`, or instruction pointer
   t iSTORE-C      \ save a copy
-\ TODO: If iADD instruction is removed, this might be difficult
-\ to get rid of.
-  one iADD        \ increment ptr to next instruction
+  r0 iSTORE-C     \ store `r0` for call to `bitinc`
+  bitinc link     \ increment ptr to next instruction
+                  \ result returned in accumulator
   ip iSTORE-C     \ `ip` points to the next instruction
   t iLOAD         \ load current instruction
   q iSTORE-C      \ Store result to `q`
@@ -382,39 +432,6 @@ assembler.1 -order
 :m (a); CAFED00D <> if abort" unstructured" then 
   assembler.1 -order ;m
 :m a; (a); vm branch ;m
-
-\ TODO: When implementing stacks using LFSR we can use XOR
-\ to to mask off the low bits of a pointer, and then XOR
-\ to put in the next sequence
-
-a: +lfsr
-  tos iLOAD-C
-  one iAND
-  t iSTORE-C
-  tos iLOAD-C
-  iRSHIFT
-  tos iSTORE-C
-  t iLOAD-C if
-    tos iLOAD-C
-    poly 2/ iXOR
-    tos iSTORE-C
-  then
-  a;
-
-a: -lfsr
-  tos iLOAD-C
-  polhi 2/ iAND
-  t iSTORE-C
-  tos iLOAD-C
-  iLSHIFT
-  tos iSTORE-C
-  t iLOAD-C if
-    tos iLOAD-C
-    -poly 2/ iXOR
-    polmsk 2/ iAND
-    tos iSTORE-C
-  then
-  a;
 
 a: exit ( -- : exit from current function ) 
 label: {unnest} ( return from function call )
@@ -462,7 +479,9 @@ a: opPush ( pushes next value in instr stream to the stack )
   {sp} iSTORE
   ip iLOAD
   tos iSTORE-C
-label: IncIp ip iLOAD-C one iADD ip iSTORE-C vm branch
+label: IncIp 
+  ip iLOAD-C r0 iSTORE-C bitinc link ip iSTORE-C 
+  vm branch
   (a);
 
 a: opJumpZ
@@ -485,7 +504,8 @@ label: Jump ( A few instructions jump here to save space )
 a: opNext
   {rp} iLOAD
   if
-    set 2/ iADD
+    r0 iSTORE-C
+    bitdec link
     {rp} iSTORE
     Jump branch
   then
@@ -519,38 +539,18 @@ a: and ( u u -- u : bit wise AND )
 label: decSp tos iSTORE-C --sp vm branch
   (a);
 
-a: add \ TODO: Turn into macro
+a: +
   tos iLOAD-C
-  t iSTORE-C
+  r0 iSTORE-C
   {sp} iLOAD
-  q iSTORE-C
-  label: readd
-    if
-      q iLOAD-C
-      t 2/ iAND
-      w iSTORE-C
-      t iLOAD-C
-      q 2/ iXOR
-      t iSTORE-C
-      w iLOAD-C
-      iLSHIFT
-      q iSTORE-C
-      readd branch 
-    then
-  t iLOAD-C
-  tos iSTORE-C
+  r1 iSTORE-C
+  bitadd link
   decSp branch
   (a);
 
 a: xor ( u u -- u : bit wise XOR )
   {sp} iLOAD
   tos 2/ iXOR
-  decSp branch
-  (a);
-
-a: + ( u u -- u : Addition )
-  {sp} iLOAD
-  tos 2/ iADD
   decSp branch
   (a);
 
@@ -694,9 +694,6 @@ FF hconst #ff  ( -- 255 : space saving measure, push `255` )
 :to dup dup ; ( u -- u u )
 :to drop drop ; ( u -- )
 :to swap swap ; ( u1 u2 -- u2 u1 )
-:to +lfsr +lfsr ;
-:to -lfsr -lfsr ;
-:to add add ;
 :h sp@ {sp} lit @ :f 1+ #1 + ; ( -- u )
 :h rp@ {rp} lit @ 1- ; ( -- u )
 : or invert swap invert and invert ;
@@ -789,7 +786,6 @@ hvar #h          ( -- a : dictionary pointer )
   then 2drop drop #-1 dup ;
 : key begin key? until ; ( -- c : get a character from UART )
 : type begin dup while swap count emit swap 1- repeat 2drop ;
-\ : type 1- for count emit next drop ;
 : cmove for aft >r dup c@ r@ c! 1+ r> 1+ then next 2drop ;
 :h do$ r> r> 2* dup count + aligned 2/ >r swap >r ; ( -- a : )
 :h ($) do$ ;            ( -- a : do string NB. )
@@ -992,11 +988,10 @@ hvar #h          ( -- a : dictionary pointer )
 :h ini hex  postpone [ #0 in! #-1 dpl ! ; ( -- )
 : info ( -- )
   cr
-  ." Project: eForth Interpreter" cr
+  ." Project: LFSR eForth" cr
   ." Author:  Richard James Howe" cr
   ." License: 0BSD / Public Domain" cr
   ." Email:   howe.r.j.89@gmail.com" cr ;
-
 : quit ( -- : interpreter loop [and more] )
   there t2/ <cold> t! \ program entry point set here
   ini

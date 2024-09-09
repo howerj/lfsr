@@ -5,30 +5,44 @@
 * Email: <mailto:howe.r.j.89@gmail.com>
 * Repo: <https://github.com/howerj/lfsr>
 
-**This project is working, but is still a work in progress**.
+This project contains a virtual machine (VM) and a program image
+containing an implementation of the programming language Forth for
+this VM that uses a Linear Feedback Shift Register (LFSR) instead of
+a normal program counter. The reason for doing this (historically)
+is that a normal program counter requires an adder which use more
+gates than a LFSR.  The problem with using an LFSR as a counter is
+that the program is scrambled.
 
-A virtual machine that uses a Linear Feedback Shift Register (LFSR) instead of a
-normal program counter. The reason for doing this (historically) is that a normal 
-program counter requires an adder which use more gates than a LFSR. The problem
-with using an LFSR as a counter is that the program is scrambled.
+From a software point of view a LFSR (both the VM and the tool-chain)
+appear more complex, only in hardware are LFSR simpler.
 
-From a software point of view a LFSR (both the VM and the tool-chain) appear
-more complex, only in hardware are LFSR simpler.
+Using a LFSR is quite a good choice when gates are at a premium and
+the counter value does not have to be visible to a user of it (such
+as a delay counter, or a counter for a stack).
 
-Using a LFSR is quite a good choice when gates are at a premium and the counter
-value does not have to be visible to a user of it (such as a delay counter, or
-a counter for a stack).
+Note that because of the pedigree of this Forth (which assumes you are
+talking to it over a UART) that it repeats every character typed into
+it, it is also does not halt on EOF (as EOF/-1 is used to indicate
+that there is no character currently available in the hardware). This
+could be changed if needed.
 
-Note that because of the pedigree of this Forth (which assumes you are talking
-to it over a UART) that it repeats every character typed into it, it is also
-does not halt on EOF (as EOF/-1 is used to indicate that there is no character
-currently available in the hardware). This could be changed if needed.
+# Usage
 
-# To Do / Notes
+Type `make run` (requires `make` and a C compiler), an examples session:
+
+	2 2 + . cr
+	: ahoy cr ." HELLO, WORLD" ;
+	ahoy
+	bye
+
+Type `gforth lfsr.fth` to rebuild `lfsr.hex`, a pre-built hex file
+containing an implementation of Forth is already provided.
+
+# To Do
 
 * [x] Get basic implementation working
 * [x] Port a Forth implementation to the machine.
-* [ ] Optimize machine (remove Add instruction, indirect bit)
+* [x] Optimize machine (remove Add instruction, put in indirect bit)
 * [ ] Port to an FPGA, make a bit-serial version?
 * [ ] Implement in 7400 series logic?
 
