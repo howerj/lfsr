@@ -16,12 +16,10 @@ typedef struct {
 	FILE *debug;
 } vm_t;
 
-static uint8_t lfsr(uint8_t lfsr, uint8_t polynomial_mask) {
-	int feedback = lfsr & 1;
-	lfsr >>= 1;
-	if (feedback)
-		lfsr ^= polynomial_mask;
-	return lfsr;
+static inline uint8_t lfsr(uint8_t n, uint8_t polynomial_mask) {
+	const int feedback = n & 1;
+	n >>= 1;
+	return feedback ? n ^ polynomial_mask : n;
 }
 
 static inline uint16_t load(vm_t *v, uint16_t addr) {
