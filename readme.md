@@ -5,14 +5,14 @@
 * Email: <mailto:howe.r.j.89@gmail.com>
 * Repo: <https://github.com/howerj/lfsr>
 
-This project contains a Virtual Machine (VM), which will be referred to
-as a CPU from now one to avoid confusion with a second VM, and a program image
-containing an implementation of the programming language Forth for
-this CPU that uses a Linear Feedback Shift Register (LFSR) instead of
-a normal program counter. The reason for doing this (historically)
-is that a normal program counter requires an adder which use more
-gates than a LFSR. The problem with using an LFSR as a counter is
-that the program is scrambled.
+This project contains a Virtual Machine (VM), which will be referred
+to as a CPU from now one to avoid confusion with a second VM,
+and a program image containing an implementation of the programming
+language Forth for this CPU that uses a Linear Feedback Shift Register
+(LFSR) instead of a normal program counter. The reason for doing this
+(historically) is that a normal program counter requires an adder
+which use more gates than a LFSR. The problem with using an LFSR as
+a counter is that the program is scrambled.
 
 From a software point of view a LFSR (both the CPU and the tool-chain)
 appear more complex, only in hardware are LFSR simpler.
@@ -27,11 +27,16 @@ it, it is also does not halt on EOF (as EOF/-1 is used to indicate
 that there is no character currently available in the hardware). This
 could be changed if needed.
 
+Using a LFSR register instead of a normal counter creates a level of
+obfuscation, if the LFSR polynomial had to be keyed in at startup it
+would form a key. This is more of an idea than anything practical.
+
 # Use cases
 
-* Just for fun.
-* Extremely small CPUs in constrained environments, it has a similar set of
-  possible uses as <https://github.com/howerj/bit-serial>.
+* Just for fun. 
+* As a proof of concept.
+* Extremely small CPUs in constrained environments, it has a similar
+set of possible uses as <https://github.com/howerj/bit-serial>.
 
 # Usage
 
@@ -45,13 +50,14 @@ Type `make run` (requires `make` and a C compiler), an examples session:
 Type `gforth lfsr.fth` to rebuild `lfsr.hex`, a pre-built hex file
 containing an implementation of Forth is already provided.
 
-This `readme.md` will not contain a Forth tutorial, look elsewhere for one.
+This `readme.md` will not contain a Forth tutorial, look elsewhere
+for one.
 
 For a list of all defined functions in Forth type `words`.
 
 Hitting `CTRL-D` **Will not** cause the system to exit.
 
-# Instruction Set
+# Instruction Set and System Design
 
 A short summary of the instruction set and design
 
@@ -61,26 +67,39 @@ A short summary of the instruction set and design
 * The lowest four bits are the operand parameter.
 * Addresses are in number of 16-bit cells, not bytes.
 * The program counter is 8-bits in size and is advanced with a LFSR.
-* The top most bit determined whether the operand is used directly or whether
-or it loaded first.
+* The top most bit determined whether the operand is used directly or 
+whether or it loaded first.
 
-The instruction set has been carefully chosen so that it should be very simple
-to implement in a traditional manner, or in a bit-serial fashion (much like my
-other CPU project at <https://github.com/howerj/bit-serial> that runs on an
-FPGA). It has also been designed so that it should be possible to implement in
-7400 series logic ICs (excluding ROM and RAM) as well as on an FPGA. There may
-be no savings in logic on an FPGA due to the fact that slices have a built in
-carry chain usually, but a comparison could be made when the system is
-implemented on an FPGA.
+The instruction set has been carefully chosen so that it
+should be very simple to implement in a traditional manner,
+or in a bit-serial fashion (much like my other CPU project at
+<https://github.com/howerj/bit-serial> that runs on an FPGA). It has
+also been designed so that it should be possible to implement in 7400
+series logic ICs (excluding ROM and RAM) as well as on an FPGA. There
+may be no savings in logic on an FPGA due to the fact that slices
+have a built in carry chain usually, but a comparison could be made
+when the system is implemented on an FPGA.
 
-As the Program Counter does not use addition, it was decided that addition
-should be removed from the instruction set. It is sorely missed and makes the
-Forth code more complex and slows it down. The only instruction that feels like
-it should be present (to me) is bit-wise OR, in practice it is not used that
-much within the interpreter so it not missed, it is reimplemented using bitwise 
-AND and INVERT (XOR against all bits set).
+As the Program Counter does not use addition, it was decided that
+addition should be removed from the instruction set. It is sorely
+missed and makes the Forth code more complex and slows it down. The
+only instruction that feels like it should be present (to me)
+is bit-wise OR, in practice it is not used that much within the
+interpreter so it not missed, it is reimplemented using bitwise AND
+and INVERT (XOR against all bits set).
 
-The instructions are:
+The instruction layout is:
+
+	+----------+---------------+-------------------+
+	|  BIT 15  | BITS 12 to 14 |    BITS 0 to 11   |
+	+----------+---------------+-------------------+
+	| INDIRECT | INSTRUCTION   | VALUE   / ADDRESS |
+	+----------+---------------+-------------------+
+
+The `INDIRECT` flag determined whether bits 0 to 11 are treated as
+a value (not set) or an address (`INDIRECT` is set).
+
+The `INSTRUCTION` field is 3-bits in size, the instructions are:
 
 	0 : AND   : ACC = ACC & ARG
 	1 : XOR   : ACC = ACC ^ ARG
@@ -91,36 +110,47 @@ The instructions are:
 	6 : JUMP  : PC = ARG
 	7 : JUMPZ : IF (ACC == 0) { PC = ARG }
 
-All instructions advance the program counter except the `JUMP`, and conditionally
-`JUMPZ`. All instruction affect or use the accumulator except the jump
-instructions, and all arguments use the `ARG` value except the shift
-instructions `LLS1`/`LRS1`. `MEM` consists of a linear array of 16-bit values.
+All instructions advance the program counter except the `JUMP`, and
+conditionally `JUMPZ`. All instruction affect or use the accumulator
+except the jump instructions, and all arguments use the `ARG` value
+except the shift instructions `LLS1`/`LRS1`. `MEM` consists of a
+linear array of 16-bit values.
+
+There is one special address, address 0. This address is never
+incremented after an instruction is run as this is a lock up state for
+the LFSR, the current instruction will be executed indefinitely. A way
+to exit this condition is for the first instruction to be a jump to
+address `1`, however any non-zero address will do. The system starts
+up executing from address zero.  Conditional jumps could be used to
+determine whether to reset or halt the system if needed.
 
 `ACC` is the 16-bit accumulator.
 
-`ARG` is either the zero extended 12-bit operand (the lowest 12-bits of the 
-instruction) as is, or the 16-bit value `MEM[operand]` if the topmost bit of the 
-instruction is set.
+`ARG` is either the zero extended 12-bit operand (the lowest 12-bits
+of the instruction) as is, or the 16-bit value `MEM[operand]` if the
+topmost bit of the instruction is set.
 
-Input and Output is memory mapped, reading from a negative address (high bit
-set) causes a byte to be read or output. This is triggered from reading or
-writing to any negative address, if multiple peripherals are to be added the
-address will have to be decoded correctly.
+Input and Output is memory mapped, reading from a negative address
+(high bit set) causes a byte to be read or output. This is triggered
+from reading or writing to any negative address, if multiple
+peripherals are to be added the address will have to be decoded
+correctly.
 
-For the purposes of simulation `JUMP` will cause the CPU to halt
-if the jump address is the same as the program counter. This will not be
-implemented in hardware.
+For the purposes of simulation `JUMP` will cause the CPU to halt if
+the jump address is the same as the program counter. This will not
+be implemented in hardware.
 
-The program counter uses a 8-bit LFSR to advance, that means only 256 16-bit
-values can be directly addressed by this CPU, this is not a
-limitation that matters for the purpose of the software running on this system,
-a complete Forth Programming Language image, as the Virtual Machine that
-supports Forth can be written in under 256 instructions for this system. That
-Forth Virtual Machine can address more memory by using LOAD/STORE to access
-values outside the 256 instruction range.
+The program counter uses a 8-bit LFSR to advance, that means only 256
+16-bit values can be directly addressed by this CPU, this is not a
+limitation that matters for the purpose of the software running on this
+system, a complete Forth Programming Language image, as the Virtual
+Machine that supports Forth can be written in under 256 instructions
+for this system. That Forth Virtual Machine can address more memory
+by using LOAD/STORE to access values outside the 256 instruction range.
 
-This instruction set might change depending on the implementation, or when it
-comes to implementation, to make things easier and smaller still.
+This instruction set might change depending on the implementation,
+or when it comes to implementation, to make things easier and smaller
+still.
 
 # To Do
 

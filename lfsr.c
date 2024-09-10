@@ -23,29 +23,30 @@ static inline uint8_t lfsr(uint8_t n, uint8_t polynomial_mask) {
 }
 
 static inline uint16_t load(vm_t *v, uint16_t addr) {
-	assert(v);
-	if (addr & 0x8000) /* more peripherals could be added if needed */
-		return v->get(v->in);
-	return v->m[addr % SZ];
+	assert(v); /* more peripherals could be added if needed */
+	return addr & 0x8000 ? v->get(v->in) : v->m[addr % SZ];
 }
 
 static inline void store(vm_t *v, uint16_t addr, uint16_t val) {
 	assert(v);
 	if (addr & 0x8000)
 		(void)v->put(v->out, val);
-	v->m[addr % SZ] = val;
+	else
+		v->m[addr % SZ] = val;
 }
 
 static int run(vm_t *v) {
 	assert(v);
 	uint16_t pc = v->pc, a = v->pc, *m = v->m; /* load machine state */
+	static const char *names[] = { "AND  ", "XOR  ", "LSL1 ", "LSR1 ", "LOAD ", "STORE", "JMP  ", "JMPZ ", };
 	for (;;) { /* An `ADD` instruction things up greatly, `OR` not so much */
 		const uint16_t ins = m[pc % SZ];
 		const uint16_t imm = ins & 0xFFF;
 		const uint16_t alu = (ins >> 12) & 0x7;
 		const uint8_t _pc = lfsr(pc, POLY);
 		const uint16_t arg = ins & 0x8000 ? load(v, imm) : imm;
-		if (v->debug && fprintf(v->debug, "%04x:%04X %04X\n", (unsigned)pc, (unsigned)ins, (unsigned)a) < 0) return -1;
+		if (v->debug && fprintf(v->debug, "%04x: %c %s %04X %04X\n", 
+				(unsigned)pc, ins & 0x8000 ? 'i' : ' ', names[alu], (unsigned)ins, (unsigned)a) < 0) return -1;
 		switch (alu) {
 		case 0: a &= arg; pc = _pc; break;
 		case 1: a ^= arg; pc = _pc; break;

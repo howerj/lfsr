@@ -539,7 +539,7 @@ a: and ( u u -- u : bit wise AND )
 label: decSp tos iSTORE-C --sp vm branch
   (a);
 
-a: +
+a: + \ Computing carry and making `um+` would speed things up
   tos iLOAD-C
   r0 iSTORE-C
   {sp} iLOAD
