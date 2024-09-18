@@ -6,7 +6,7 @@
 #include <assert.h>
 
 #define SZ (0x2000)
-#define POLY (0xB8)
+#define POLY (0xB8) /* 0x84 gives period 217 instead of 255 but uses 2 taps */
 
 typedef struct {
 	uint16_t m[SZ], pc, a;

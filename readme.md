@@ -14,6 +14,9 @@ language Forth for this CPU that uses a Linear Feedback Shift Register
 which use more gates than a LFSR. The problem with using an LFSR as
 a counter is that the program is scrambled.
 
+To see an implementation of this system on an FPGA visit
+<https://github.com/howerj/lfsr-vhdl>. It is written in VHDL.
+
 From a software point of view a LFSR (both the CPU and the tool-chain)
 appear more complex, only in hardware are LFSR simpler.
 
@@ -157,8 +160,14 @@ still.
 * [x] Get basic implementation working
 * [x] Port a Forth implementation to the machine.
 * [x] Optimize machine (remove Add instruction, put in indirect bit)
-* [ ] Port to an FPGA, make a bit-serial version?
+* [x] Port to an FPGA
+  - [x] See <https://github.com/howerj/lfsr-vhdl>
+  - [ ] make a bit-serial version?
 * [ ] Implement in 7400 series logic?
+  - [ ] Separate the eForth image into `ROM` and `RAM` sections. We
+  should able to make the first X KiB of the image read-only. This might
+  mean cutting the image down to get it under a 4KiB limit and moving
+  variables.
 
 # References
 

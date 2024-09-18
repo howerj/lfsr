@@ -158,8 +158,7 @@ size =cell - tep !
 
 variable vms 0 vms !
 variable pc 1 pc !
-$B8 constant polynomial
-$71 constant -polynomial
+$B8 constant polynomial \ $84 uses two taps, period 217/$D9
 $FF constant period
 
 : :m meta.1 +order also definitions : ;
@@ -247,6 +246,7 @@ ordering cr
 :m tv' t' >tbody ;m ( address of variable )
 :m t2/ 2/ ;m
 :m t2* 2* ;m
+\ This should rounded up period to nearest power of 2
 :m unlfsr period 2* there + tallot ;m
 :m pc, pc @ 2* t! pc++ ;m
 
@@ -297,7 +297,6 @@ unlfsr
 FF00 tvar ins          \ instruction mask
 FFFF tvar set          \ all bits set, -1
  polynomial tvar  poly \ LFSR poly
--polynomial tvar -poly \ LFSR reverse poly
 $80 tvar polhi         \ LFSR reverse poly high bit
 $FF tvar polmsk        \ LFSR reverse poly mask
 
