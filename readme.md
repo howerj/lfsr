@@ -107,8 +107,8 @@ a value (not set) or an address (`INDIRECT` is set).
 
 The `INSTRUCTION` field is 3-bits in size, the instructions are:
 
-	0 : AND   : ACC = ACC & ARG
-	1 : XOR   : ACC = ACC ^ ARG
+	0 : XOR   : ACC = ACC ^ ARG
+	1 : AND   : ACC = ACC & ARG
 	2 : LLS1  : ACC = ACC << 1
 	3 : LRS1  : ACC = ACC >> 1
 	4 : LOAD  : ACC = MEM[ARG]

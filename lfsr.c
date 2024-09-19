@@ -38,7 +38,7 @@ static inline void store(vm_t *v, uint16_t addr, uint16_t val) {
 static int run(vm_t *v) {
 	assert(v);
 	uint16_t pc = v->pc, a = v->pc, *m = v->m; /* load machine state */
-	static const char *names[] = { "AND  ", "XOR  ", "LSL1 ", "LSR1 ", "LOAD ", "STORE", "JMP  ", "JMPZ ", };
+	static const char *names[] = { "XOR  ", "AND  ", "LSL1 ", "LSR1 ", "LOAD ", "STORE", "JMP  ", "JMPZ ", };
 	for (;;) { /* An `ADD` instruction things up greatly, `OR` not so much */
 		const uint16_t ins = m[pc % SZ];
 		const uint16_t imm = ins & 0xFFF;
@@ -48,8 +48,8 @@ static int run(vm_t *v) {
 		if (v->debug && fprintf(v->debug, "%04x: %c %s %04X %04X\n", 
 				(unsigned)pc, ins & 0x8000 ? 'i' : ' ', names[alu], (unsigned)ins, (unsigned)a) < 0) return -1;
 		switch (alu) {
-		case 0: a &= arg; pc = _pc; break;
-		case 1: a ^= arg; pc = _pc; break;
+		case 0: a ^= arg; pc = _pc; break;
+		case 1: a &= arg; pc = _pc; break;
 		case 2: a <<= 1; pc = _pc; break;
 		case 3: a >>= 1; pc = _pc; break;
 		case 4: a = load(v, arg); pc = _pc; break;

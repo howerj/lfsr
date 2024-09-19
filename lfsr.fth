@@ -252,8 +252,8 @@ ordering cr
 
 : jump-val 6000 ; \ jump instruction value
 
-: iAND     8000 0000 or or pc, ;
-: iXOR     8000 1000 or or pc, ;
+: iXOR     8000 0000 or or pc, ;
+: iAND     8000 1000 or or pc, ;
 : iLSHIFT  2000 pc, ; \ LSHIFT only be 1 place
 : iRSHIFT  3000 pc, ; \ RSHIFT only by 1 place
 : iLOAD-C  2/ 4000 or pc, ; \ Load immediate
