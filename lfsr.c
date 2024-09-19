@@ -8,6 +8,22 @@
 #define SZ (0x2000)
 #define POLY (0xB8) /* 0x84 gives period 217 instead of 255 but uses 2 taps */
 
+#define OPCODES \
+	_(ADD) \
+	_(XOR) \
+	_(LLS1) \
+	_(LRS1) \
+	_(LOAD) \
+	_(STORE) \
+	_(JUMP) \
+	_(JUMPZ)
+
+typedef enum {
+#define _(op) OP_##op,
+	OPCODES
+#undef _
+} opcode_t;
+
 typedef struct {
 	uint16_t m[SZ], pc, a;
 	int (*get)(void *in);
@@ -38,24 +54,30 @@ static inline void store(vm_t *v, uint16_t addr, uint16_t val) {
 static int run(vm_t *v) {
 	assert(v);
 	uint16_t pc = v->pc, a = v->pc, *m = v->m; /* load machine state */
-	static const char *names[] = { "AND  ", "XOR  ", "LSL1 ", "LSR1 ", "LOAD ", "STORE", "JMP  ", "JMPZ ", };
+	static const char *names[] = {
+#define _(op) #op,
+		OPCODES
+#undef _
+	};
 	for (;;) { /* An `ADD` instruction things up greatly, `OR` not so much */
 		const uint16_t ins = m[pc % SZ];
 		const uint16_t imm = ins & 0xFFF;
 		const uint16_t alu = (ins >> 12) & 0x7;
 		const uint8_t _pc = lfsr(pc, POLY);
 		const uint16_t arg = ins & 0x8000 ? load(v, imm) : imm;
-		if (v->debug && fprintf(v->debug, "%04x: %c %s %04X %04X\n", 
+		if (v->debug && fprintf(v->debug, "%04x: %c %-5s %04X %04X\n",
 				(unsigned)pc, ins & 0x8000 ? 'i' : ' ', names[alu], (unsigned)ins, (unsigned)a) < 0) return -1;
 		switch (alu) {
-		case 0: a &= arg; pc = _pc; break;
-		case 1: a ^= arg; pc = _pc; break;
-		case 2: a <<= 1; pc = _pc; break;
-		case 3: a >>= 1; pc = _pc; break;
-		case 4: a = load(v, arg); pc = _pc; break;
-		case 5: store(v, arg, a); pc = _pc; break;
-		case 6: if (pc == arg) goto end; pc = arg; break; /* `goto end` for testing only */
-		case 7: pc = _pc; if (!a) pc = arg; break;
+#define _(op) OP_##op
+		case _(ADD):   a &= arg; pc = _pc; break;
+		case _(XOR):   a ^= arg; pc = _pc; break;
+		case _(LLS1):  a <<= 1; pc = _pc; break;
+		case _(LRS1):  a >>= 1; pc = _pc; break;
+		case _(LOAD):  a = load(v, arg); pc = _pc; break;
+		case _(STORE): store(v, arg, a); pc = _pc; break;
+		case _(JUMP):  if (pc == arg) goto end; pc = arg; break; /* `goto end` for testing only */
+		case _(JUMPZ): pc = _pc; if (!a) pc = arg; break;
+#undef _
 		}
 	}
 end:
