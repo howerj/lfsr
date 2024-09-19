@@ -62,7 +62,7 @@ Hitting `CTRL-D` **Will not** cause the system to exit.
 
 # Instruction Set and System Design
 
-A short summary of the instruction set and design
+A short summary of the instruction set and design:
 
 * The machine is an accumulator based machine.
 * All instructions are 16-bits in length.
@@ -80,13 +80,16 @@ or in a bit-serial fashion (much like my other CPU project at
 also been designed so that it should be possible to implement in 7400
 series logic ICs (excluding ROM and RAM) as well as on an FPGA. There
 may be no savings in logic on an FPGA due to the fact that slices
-have a built in carry chain usually, but a comparison could be made
-when the system is implemented on an FPGA.
+have a built in carry chain (usually), but a comparison could be made
+when the system is implemented on an FPGA (This has been done, there
+is very little difference).
 
 As the Program Counter does not use addition, it was decided that
-addition should be removed from the instruction set. It is sorely
+addition should be removed from the instruction set. It would be a
+bit weird to worry about all the gates the Program Counter is using and
+then just include an adder elsewhere. The ADD instruction is sorely
 missed and makes the Forth code more complex and slows it down. The
-only instruction that feels like it should be present (to me)
+only other instruction that feels like it should be present (to me)
 is bit-wise OR, in practice it is not used that much within the
 interpreter so it not missed, it is reimplemented using bitwise AND
 and INVERT (XOR against all bits set).
@@ -113,8 +116,8 @@ The `INSTRUCTION` field is 3-bits in size, the instructions are:
 	6 : JUMP  : PC = ARG
 	7 : JUMPZ : IF (ACC == 0) { PC = ARG }
 
-All instructions advance the program counter except the `JUMP`, and
-conditionally `JUMPZ`. All instruction affect or use the accumulator
+All instructions advance the program counter except `JUMP`, and
+(conditionally) `JUMPZ`. All instruction affect or use the accumulator
 except the jump instructions, and all arguments use the `ARG` value
 except the shift instructions `LLS1`/`LRS1`. `MEM` consists of a
 linear array of 16-bit values.
@@ -124,8 +127,10 @@ incremented after an instruction is run as this is a lock up state for
 the LFSR, the current instruction will be executed indefinitely. A way
 to exit this condition is for the first instruction to be a jump to
 address `1`, however any non-zero address will do. The system starts
-up executing from address zero.  Conditional jumps could be used to
-determine whether to reset or halt the system if needed.
+up executing from address zero. Conditional jumps could be used to
+determine whether to reset or halt the system if needed. Alternatively
+a LFSR that used XNOR could have been used (the lockup state for which 
+is all ones) but it was not.
 
 `ACC` is the 16-bit accumulator.
 
@@ -159,10 +164,12 @@ still.
 
 * [x] Get basic implementation working
 * [x] Port a Forth implementation to the machine.
+  - [ ]  Make a build target for a VM that is exactly the same except
+  it uses normal program counter. (optional)
 * [x] Optimize machine (remove Add instruction, put in indirect bit)
 * [x] Port to an FPGA
   - [x] See <https://github.com/howerj/lfsr-vhdl>
-  - [ ] make a bit-serial version?
+  - [ ] make a bit-serial version? (optional)
 * [ ] Implement in 7400 series logic?
   - [ ] Separate the eForth image into `ROM` and `RAM` sections. We
   should able to make the first X KiB of the image read-only. This might
