@@ -255,6 +255,11 @@ ordering cr
 : iXOR     8000 0000 or or pc, ;
 : iAND     8000 1000 or or pc, ;
 : iLSHIFT  2000 pc, ; \ LSHIFT only be 1 place
+\ LSHIFT only by 1 place, also works when ADD replaces this 
+\ instruction when adding a location that contains a copy of
+\ the accumulator. This is slightly less efficient than just
+\ calling iLSHIFT in hardware
+: iLSHIFT* 2/ 8000 2000 or or pc, ; 
 : iRSHIFT  3000 pc, ; \ RSHIFT only by 1 place
 : iLOAD-C  2/ 4000 or pc, ; \ Load immediate
 : iLOAD    2/ 8000 4000 or or pc, ; \ Load through immediate
@@ -326,8 +331,6 @@ TERMBUF =buf + constant =tbufend
    branch
    pc @ t, ;m
 
-\ $58 tvar xxx : .x xxx iLOAD-C set iSTORE ;
-
 assembler.1 +order
 label: bitadd
    r1 iLOAD-C
@@ -338,7 +341,7 @@ label: bitadd
      r1 2/ iXOR
      r0 iSTORE-C
      r2 iLOAD-C
-     iLSHIFT
+     r2 iLSHIFT* \ or just `iLSHIFT`
      r1 iSTORE-C
      bitadd branch
    then
