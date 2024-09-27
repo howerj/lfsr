@@ -109,8 +109,8 @@ The `INSTRUCTION` field is 3-bits in size, the instructions are:
 
 	0 : XOR   : ACC = ACC ^ ARG
 	1 : AND   : ACC = ACC & ARG
-	2 : LLS1  : ACC = ACC << 1
-	3 : LRS1  : ACC = ACC >> 1
+	2 : LLS1  : ACC = ARG << 1
+	3 : LRS1  : ACC = ARG >> 1
 	4 : LOAD  : ACC = MEM[ARG]
 	5 : STORE : MEM[ARG] = ACC
 	6 : JUMP  : PC = ARG
@@ -118,9 +118,8 @@ The `INSTRUCTION` field is 3-bits in size, the instructions are:
 
 All instructions advance the program counter except `JUMP`, and
 (conditionally) `JUMPZ`. All instruction affect or use the accumulator
-except the jump instructions, and all arguments use the `ARG` value
-except the shift instructions `LLS1`/`LRS1`. `MEM` consists of a
-linear array of 16-bit values.
+except the jump instructions, and all arguments use the `ARG` value.
+`MEM` consists of a linear array of 16-bit values.
 
 There is one special address, address 0. This address is never
 incremented after an instruction is run as this is a lock up state for

@@ -254,13 +254,8 @@ ordering cr
 
 : iXOR     8000 0000 or or pc, ;
 : iAND     8000 1000 or or pc, ;
-: iLSHIFT  2000 pc, ; \ LSHIFT only be 1 place
-\ LSHIFT only by 1 place, also works when ADD replaces this 
-\ instruction when adding a location that contains a copy of
-\ the accumulator. This is slightly less efficient than just
-\ calling iLSHIFT in hardware
-: iLSHIFT* 2/ 8000 2000 or or pc, ; 
-: iRSHIFT  3000 pc, ; \ RSHIFT only by 1 place
+: iLSHIFT  2/ 8000 2000 or or pc, ; 
+: iRSHIFT  2/ 8000 3000 or or pc, ; \ RSHIFT only by 1 place
 : iLOAD-C  2/ 4000 or pc, ; \ Load immediate
 : iLOAD    2/ 8000 4000 or or pc, ; \ Load through immediate
 : iSTORE-C 2/ 5000 or pc, ; \ Store acc to imm location
@@ -301,7 +296,7 @@ unlfsr
    1 tvar @1           \ must contain `1`
 FF00 tvar ins          \ instruction mask
 FFFF tvar set          \ all bits set, -1
- polynomial tvar  poly \ LFSR poly
+ polynomial tvar poly  \ LFSR poly
 $80 tvar polhi         \ LFSR reverse poly high bit
 $FF tvar polmsk        \ LFSR reverse poly mask
 
@@ -318,7 +313,7 @@ $FF tvar polmsk        \ LFSR reverse poly mask
    0 tvar r1
    0 tvar r2
    0 tvar tos       \ top of stack
-   0 tvar rlink      \ link register
+   0 tvar rlink     \ link register
  =end              dup tvar {sp0} tvar {sp} \ grows downwards
  =end =stksz 2* -  dup tvar {rp0} tvar {rp} \ grows upwards
  =end =stksz 2* - =buf - constant TERMBUF \ pad buffer space
@@ -340,8 +335,8 @@ label: bitadd
      r0 iLOAD-C
      r1 2/ iXOR
      r0 iSTORE-C
-     r2 iLOAD-C
-     r2 iLSHIFT* \ or just `iLSHIFT`
+     r2 iLOAD-C \ If iLSHIFT is replaced with ADD
+     r2 iLSHIFT \ then this still works because iLOAD-C
      r1 iSTORE-C
      bitadd branch
    then
@@ -380,9 +375,6 @@ label: rp+1
 
 assembler.1 -order
 
-: one @1 2/ ;
-: vcell one ;
-: -vcell set 2/ ;
 : --sp sp-1 link {sp} iSTORE-C ;
 : ++sp sp+1 link {sp} iSTORE-C ;
 : --rp rp-1 link {rp} iSTORE-C ;
@@ -557,22 +549,19 @@ a: xor ( u u -- u : bit wise XOR )
   (a);
 
 a: lrs ( u -- u : shift right by number of bits set )
-  tos iLOAD-C
-  iRSHIFT
+  tos iRSHIFT
   tos iSTORE-C
   a;
 
 a: @ ( a -- u : load a memory address )
-  tos iLOAD-C
-  iRSHIFT
+  tos iRSHIFT
   tos iSTORE-C
   tos iLOAD
   tos iSTORE-C
   a;
 
 a: ! ( u a -- store a cell at a memory address )
-  tos iLOAD-C
-  iRSHIFT
+  tos iRSHIFT
   t iSTORE-C
   {sp} iLOAD
   t iSTORE

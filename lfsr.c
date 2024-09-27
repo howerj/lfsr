@@ -22,9 +22,9 @@ static inline uint8_t lfsr(uint8_t n, uint8_t polynomial_mask) {
 	return feedback ? n ^ polynomial_mask : n;
 }
 
-static inline uint16_t load(vm_t *v, uint16_t addr) {
+static inline uint16_t load(vm_t *v, uint16_t addr, int io) {
 	assert(v); /* more peripherals could be added if needed */
-	return addr & 0x8000 ? v->get(v->in) : v->m[addr % SZ];
+	return io && addr & 0x8000 ? v->get(v->in) : v->m[addr % SZ];
 }
 
 static inline void store(vm_t *v, uint16_t addr, uint16_t val) {
@@ -44,15 +44,15 @@ static int run(vm_t *v) {
 		const uint16_t imm = ins & 0xFFF;
 		const uint16_t alu = (ins >> 12) & 0x7;
 		const uint8_t _pc = lfsr(pc, POLY);
-		const uint16_t arg = ins & 0x8000 ? load(v, imm) : imm;
+		const uint16_t arg = ins & 0x8000 ? load(v, imm, 0) : imm;
 		if (v->debug && fprintf(v->debug, "%04x: %c %s %04X %04X\n", 
-				(unsigned)pc, ins & 0x8000 ? 'i' : ' ', names[alu], (unsigned)ins, (unsigned)a) < 0) return -1;
+				(unsigned)pc, ins & 0x8000 ? 'i' : '-', names[alu], (unsigned)ins, (unsigned)a) < 0) return -1;
 		switch (alu) {
 		case 0: a ^= arg; pc = _pc; break;
 		case 1: a &= arg; pc = _pc; break;
-		case 2: a <<= 1; pc = _pc; break;
-		case 3: a >>= 1; pc = _pc; break;
-		case 4: a = load(v, arg); pc = _pc; break;
+		case 2: a = arg << 1; pc = _pc; break;
+		case 3: a = arg >> 1; pc = _pc; break;
+		case 4: a = load(v, arg, 1); pc = _pc; break;
 		case 5: store(v, arg, a); pc = _pc; break;
 		case 6: if (pc == arg) goto end; pc = arg; break; /* `goto end` for testing only */
 		case 7: pc = _pc; if (!a) pc = arg; break;
