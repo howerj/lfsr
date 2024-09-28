@@ -139,10 +139,11 @@ meta.1 +order also definitions
 \ `1000` almost works
 
    2 constant =cell
-2000 constant size 
-2000 constant =end ( 8192 bytes, leaving half for DP-BRAM )
+1000 constant size 
+1000 constant =end ( 8192 bytes, leaving half for DP-BRAM )
   40 constant =stksz
-  60 constant =buf
+  80 constant =buf
+
 0008 constant =bksp
 000A constant =lf
 000D constant =cr
@@ -151,9 +152,7 @@ meta.1 +order also definitions
 create tflash size cells here over erase allot
 
 variable tdp
-variable tep
 variable tlast
-size =cell - tep !
 0 tlast !
 
 variable vms 0 vms !
@@ -314,11 +313,11 @@ $FF tvar polmsk        \ LFSR reverse poly mask
    0 tvar r2
    0 tvar tos       \ top of stack
    0 tvar rlink     \ link register
- =end              dup tvar {sp0} tvar {sp} \ grows downwards
- =end =stksz 2* -  dup tvar {rp0} tvar {rp} \ grows upwards
- =end =stksz 2* - =buf - constant TERMBUF \ pad buffer space
 
-TERMBUF =buf + constant =tbufend
+=end 200 - 2* constant TERMBUF
+=end 100 - dup tvar {rp0} tvar {rp}
+=end 1- dup tvar {sp0} tvar {sp}
+TERMBUF =buf 2* + constant =tbufend
 
 :m link 
    there iLOAD-C
