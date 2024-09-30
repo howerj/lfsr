@@ -1,4 +1,4 @@
-CFLAGS=-Wall -Wextra -pedantic -std=c99 -O2
+CFLAGS=-Wall -Wextra -pedantic -std=c99 -O3
 IMAGE=lfsr.hex
 TARGET=lfsr
 

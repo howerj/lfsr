@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define SZ (0x1000)
+#define SZ         (0x1000)
 #define POLYNOMIAL (0xB8) /* 0x84 gives period 217 instead of 255 but uses 2 taps */
-#define PCMSK (0xFF)
+#define PCMSK      (0xFF)
 
 enum { OLFSR = 1 << 0, OADD = 1 << 1, OFIRST = 1 << 2, };
 
@@ -18,18 +18,18 @@ typedef struct {
 	FILE *debug;
 } vm_t;
 
-static inline uint16_t lfsr(uint16_t n, uint16_t polynomial_mask, int add) {
+static inline uint16_t lfsr(uint16_t n, const uint16_t polynomial_mask, const int add) {
 	if (add) return (n + 1) & PCMSK;
 	const int feedback = n & 1;
 	n >>= 1;
 	return (feedback ? n ^ polynomial_mask : n) & PCMSK;
 }
 
-static inline uint16_t load(vm_t *v, uint16_t addr, int io) { /* more peripherals could be added if needed */
+static inline uint16_t load(vm_t *v, const uint16_t addr, const int io) { /* more peripherals could be added if needed */
 	return io && addr & 0x8000 ? v->get(v->in) : v->m[addr % SZ];
 }
 
-static inline void store(vm_t *v, uint16_t addr, uint16_t val, long cycles) {
+static inline void store(vm_t *v, const uint16_t addr, const uint16_t val, const long cycles) {
 	if (addr & 0x8000) {
 		if (v->opts & OFIRST) { /* Useful to know when simulating the VHDL test-bench */
 			v->opts &= ~OFIRST;
@@ -42,7 +42,7 @@ static inline void store(vm_t *v, uint16_t addr, uint16_t val, long cycles) {
 	}
 }
 
-static int run(vm_t *v) {
+static inline int run(vm_t *v) {
 	uint16_t pc = v->pc, a = v->pc, *m = v->m, opts = v->opts; /* load machine state */
 	static const char *names[] = { "xor", "and", "lsl1", "lsr1", "load", "store", "jmp", "jmpz", };
 	for (long cycles = 0;;cycles++) { /* An `ADD` instruction things up greatly, `OR` not so much */

@@ -165,6 +165,8 @@ $FF constant period
 :m .h base @ >r hex     u. r> base ! ;m
 :m .d base @ >r decimal u. r> base ! ;m
 
+\ TODO: Optionally generate `normal` images with a PC that
+\ increments instead of using an LFSR.
 :m lfsr ( state -- state )
   dup 1 and ( mask off feed back )
   swap 1 rshift swap ( state /= 2 )
@@ -250,22 +252,26 @@ ordering cr
 :m pc, pc @ 2* t! pc++ ;m
 
 : jump-val 6000 ; \ jump instruction value
+: rshift-val 3000 ;
 
-: iXOR     8000 0000 or or pc, ;
-: iAND     8000 1000 or or pc, ;
+: iXOR     2/ 8000 0000 or or pc, ;
+: iAND     2/ 8000 1000 or or pc, ;
 : iLSHIFT  2/ 8000 2000 or or pc, ; 
-: iRSHIFT  2/ 8000 3000 or or pc, ; \ RSHIFT only by 1 place
+: iRSHIFT  2/ 8000 rshift-val or or pc, ; \ RSHIFT only by 1
 : iLOAD-C  2/ 4000 or pc, ; \ Load immediate
 : iLOAD    2/ 8000 4000 or or pc, ; \ Load through immediate
 : iSTORE-C 2/ 5000 or pc, ; \ Store acc to imm location
 : iSTORE   2/ 8000 5000 or or pc, ; 
-: iJUMP    jump-val or pc, ; \ Unconditional jump
-: iPC!     8000 jump-val or or pc, ; \ Indirect Jump
-: iJUMPZ   7000 or pc, ; \ Conditional Jump!
-: iPC!Z    8000 7000 or or pc, ; \ Indirect Conditional Jump!
+: iJUMP    2/ jump-val or pc, ; \ Unconditional jump
+: iPC!     2/ 8000 jump-val or or pc, ; \ Indirect Jump
+: iJUMPZ   2/ 7000 or pc, ; \ Conditional Jump!
+: iPC!Z    2/ 8000 7000 or or pc, ; \ Indirect Cond. Jump!
+: iLITERAL
+  2* dup $F000 and 0<> abort" literal too large"
+  rshift-val or pc, ;
 
-: branch 2/ iJUMP ;
-: ?branch 2/ iJUMPZ ;
+: branch iJUMP ;
+: ?branch iJUMPZ ;
 : call 2/ ( iJUMP -> ) jump-val or ;
 : thread 2/ ;
 : thread, thread t, ;
@@ -292,12 +298,9 @@ label: entry ( previous instructions are irrelevant )
 unlfsr
 
    \ Constants not variables
-   1 tvar @1           \ must contain `1`
-FF00 tvar ins          \ instruction mask
-FFFF tvar set          \ all bits set, -1
- polynomial tvar poly  \ LFSR poly
-$80 tvar polhi         \ LFSR reverse poly high bit
-$FF tvar polmsk        \ LFSR reverse poly mask
+  8000 tvar high       \ must contain `8000`
+  FF00 tvar ins        \ instruction mask
+  FFFF tvar set        \ all bits set, -1
 
   \ These variables, along with some defined in the Forth
   \ code, need to be written to, hampering turning the
@@ -307,12 +310,13 @@ $FF tvar polmsk        \ LFSR reverse poly mask
    0 tvar <cold>    \ entry point of virtual machine, set later
    0 tvar ip        \ instruction pointer
    0 tvar t         \ temporary register
-   0 tvar q         \ second, temporary register
-   0 tvar r0
-   0 tvar r1
-   0 tvar r2
+   0 tvar q         \ second, temporary, register
+   0 tvar r0        \ third, temporary, reg
+   0 tvar r1        \ fourth register
+   0 tvar r2        \ fifth register...
    0 tvar tos       \ top of stack
    0 tvar rlink     \ link register
+   0 tvar addon     \ ADD has replaced `LSHIFT by 1`
 
 =end 200 - 2* constant TERMBUF
 =end 100 - dup tvar {rp0} tvar {rp}
@@ -327,23 +331,30 @@ TERMBUF =buf 2* + constant =tbufend
 
 assembler.1 +order
 label: bitadd
+   addon iLOAD-C
+   if \ If `iLSHIFT` is actually an add instruction
+     r0 iLOAD-C
+     r1 iLSHIFT
+     r0 iSTORE-C
+     rlink iPC!
+   then
+
    r1 iLOAD-C
    if
-     r0 2/ iAND
+     r0 iAND
      r2 iSTORE-C
      r0 iLOAD-C
-     r1 2/ iXOR
+     r1 iXOR
      r0 iSTORE-C
-     r2 iLOAD-C \ If iLSHIFT is replaced with ADD
-     r2 iLSHIFT \ then this still works because iLOAD-C
+     r2 iLSHIFT
      r1 iSTORE-C
      bitadd branch
    then
    r0 iLOAD-C \ Return result in accumulator
-   rlink 2/ iPC!
+   rlink iPC!
 
 label: bitinc
-   @1 iLOAD-C
+   1 iLITERAL
    r1 iSTORE-C
    bitadd branch
 
@@ -380,8 +391,17 @@ assembler.1 -order
 : ++rp rp+1 link {rp} iSTORE-C ;
 
 \ --- ---- ---- ---- Forth VM ---- ---- ---- ---- ---- ---- --- 
+assembler.1 +order
 label: start \ Forth VM entry point
   start call entry t! \ Set entry point
+
+  \ Detect if iLSHIFT is actually an ADD instruction
+  0 iLITERAL
+  high iLSHIFT  
+  if
+    1 iLITERAL
+    addon iSTORE-C \ iLSHIFT is actually add
+  then
 
   {sp0} iLOAD-C {sp} iSTORE-C \ Set initial v.stk ptr
   {rp0} iLOAD-C {rp} iSTORE-C \ Set initial r.stk ptr
@@ -389,7 +409,6 @@ label: start \ Forth VM entry point
   ip iSTORE-C         \ Set instruction pointer to word
   \ -- fall-through --
 label: vm ( The Forth virtual machine )
-assembler.1 +order
 
   ip iLOAD-C      \ load `ip`, or instruction pointer
   t iSTORE-C      \ save a copy
@@ -399,8 +418,8 @@ assembler.1 +order
   ip iSTORE-C     \ `ip` points to the next instruction
   t iLOAD         \ load current instruction
   q iSTORE-C      \ Store result to `q`
-  ins 2/ iAND     \ Mask off high bits
-  q 2/ iPC!Z      \ Conditional Jump indirect through `q`
+  ins iAND        \ Mask off high bits
+  q iPC!Z         \ Conditional Jump indirect through `q`
   ++rp            \ increment return stack pointer
   ip iLOAD-C      \ load location of next instruction
   {rp} iSTORE     \ store return location
@@ -528,7 +547,7 @@ a: bye pc @ 2* branch (a);   ( -- : bye bye! )
 
 a: and ( u u -- u : bit wise AND )
   {sp} iLOAD
-  tos 2/ iAND
+  tos iAND
 label: decSp tos iSTORE-C --sp vm branch
   (a);
 
@@ -543,7 +562,7 @@ a: + \ Computing carry and making `um+` would speed things up
 
 a: xor ( u u -- u : bit wise XOR )
   {sp} iLOAD
-  tos 2/ iXOR
+  tos iXOR
   decSp branch
   (a);
 
