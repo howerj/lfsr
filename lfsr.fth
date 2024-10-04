@@ -297,7 +297,7 @@ label: entry ( previous instructions are irrelevant )
 0 pc,  \ entry point of VM
 unlfsr
 
-   \ Constants not variables
+  \ Constants not variables
   8000 tvar high       \ must contain `8000`
   FF00 tvar ins        \ instruction mask
   FFFF tvar set        \ all bits set, -1
@@ -318,18 +318,32 @@ unlfsr
    0 tvar rlink     \ link register
    0 tvar addon     \ ADD has replaced `LSHIFT by 1`
 
+\ Set up stack pointers and line buffer at fixed locations
 =end 200 - 2* constant TERMBUF
 =end 100 - dup tvar {rp0} tvar {rp}
 =end 1- dup tvar {sp0} tvar {sp}
 TERMBUF =buf 2* + constant =tbufend
 
-:m link 
-   there iLOAD-C
-   rlink iSTORE-C
-   branch
-   pc @ t, ;m
+\ `link` uses `rlink` as a link register, this allows us to
+\ call a function and return, but not call functions from
+\ within that function (but we can branch to them as the
+\ last instruction of a call). These functions much load
+\ and jump through `rlink` at the end.
+:m link ( a -- : perform limited call with link register )
+   there iLOAD-C   \ load location where we will store PC
+   rlink iSTORE-C  \ store in link register
+   branch          \ branch to function
+   pc @ t, ;m      \ store PC to be loaded by fist instruction
 
 assembler.1 +order
+label: sp-1
+   {sp} iLOAD-C
+   r0 iSTORE-C
+   \ Fall-through...
+label: bitinc
+   1 iLITERAL
+   r1 iSTORE-C
+   \ Fall-through...
 label: bitadd
    addon iLOAD-C
    if \ If `iLSHIFT` is actually an add instruction
@@ -338,7 +352,8 @@ label: bitadd
      r0 iSTORE-C
      rlink iPC!
    then
-
+   \ Fall-through...
+label: bitloop
    r1 iLOAD-C
    if
      r0 iAND
@@ -348,30 +363,19 @@ label: bitadd
      r0 iSTORE-C
      r2 iLSHIFT
      r1 iSTORE-C
-     bitadd branch
+     bitloop branch
    then
    r0 iLOAD-C \ Return result in accumulator
    rlink iPC!
 
-label: bitinc
-   1 iLITERAL
-   r1 iSTORE-C
-   bitadd branch
-
+label: sp+1
+   {sp} iLOAD-C
+   r0 iSTORE-C
+   \ Fall-through...
 label: bitdec
    set iLOAD-C
    r1 iSTORE-C
    bitadd branch
-
-label: sp-1
-   {sp} iLOAD-C
-   r0 iSTORE-C
-   bitinc branch
-
-label: sp+1
-   {sp} iLOAD-C
-   r0 iSTORE-C
-   bitdec branch
 
 label: rp-1
    {rp} iLOAD-C
@@ -399,8 +403,7 @@ label: start \ Forth VM entry point
   0 iLITERAL
   high iLSHIFT  
   if
-    1 iLITERAL
-    addon iSTORE-C \ iLSHIFT is actually add
+    addon iSTORE-C \ iLSHIFT is actually add, store non-zero
   then
 
   {sp0} iLOAD-C {sp} iSTORE-C \ Set initial v.stk ptr
@@ -556,8 +559,9 @@ a: + \ Computing carry and making `um+` would speed things up
   r0 iSTORE-C
   {sp} iLOAD
   r1 iSTORE-C
-  bitadd link
-  decSp branch
+  bitadd link 
+  there 2 - decSp 2/ swap t! \ link jumps to decSp after call
+\  decSp branch \ The previous line replaces this one
   (a);
 
 a: xor ( u u -- u : bit wise XOR )
@@ -680,7 +684,7 @@ assembler.1 -order
 : invert #-1 xor ; ( u -- u )
 : negate 1- invert ; ( n -- n : negate [twos compliment] )
 : - negate + ;       ( u u -- u : subtract )
-: 2* dup + ;           ( u -- u : multiply by two )
+: 2* dup + ;         ( u -- u : multiply by two )
 : 2/ lrs ;           ( u -- u : divide by two )
 : ?dup dup if dup then ; ( u -- u u | 0 : dup if not zero )
 : rshift begin ?dup while 1- swap 2/ swap repeat ;
