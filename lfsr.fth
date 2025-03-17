@@ -49,6 +49,9 @@
 \ `vm.hex`) should be available if you do not have gforth 
 \ installed.
 \
+\ As there is no great place for the following code sections
+\ about addition and LFSR up/down counting, I'll place it here:
+\
 \ This code can be used to perform addition, and is what is
 \ used for the `bitadd` function:
 \        
@@ -165,7 +168,7 @@ $FF constant period
 :m .h base @ >r hex     u. r> base ! ;m
 :m .d base @ >r decimal u. r> base ! ;m
 
-\ TODO: Optionally generate `normal` images with a PC that
+\ We could optionally generate `normal` images with a PC that
 \ increments instead of using an LFSR.
 :m lfsr ( state -- state )
   dup 1 and ( mask off feed back )
@@ -327,8 +330,8 @@ TERMBUF =buf 2* + constant =tbufend
 \ `link` uses `rlink` as a link register, this allows us to
 \ call a function and return, but not call functions from
 \ within that function (but we can branch to them as the
-\ last instruction of a call). These functions much load
-\ and jump through `rlink` at the end.
+\ last instruction of a call). These functions must load
+\ and jump through `rlink` at the end with `rlink iPC!`.
 :m link ( a -- : perform limited call with link register )
    there iLOAD-C   \ load location where we will store PC
    rlink iSTORE-C  \ store in link register
