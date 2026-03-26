@@ -1,7 +1,7 @@
 \ Author: Richard James Howe
 \ Email: howe.r.j.89@gmail.com
 \ Repo: https://github.com/howerj/lfsr
-\ License: MIT
+\ License: 0BSD / Public Domain
 \
 \ Cross Compiler and eForth interpreter for a (currently
 \ in the design stage) CPU which will be built out of 7400
@@ -119,7 +119,14 @@
 \          return 0;
 \        }
 \        
-\ Now on to the eForth interpreter.
+\ Now on to the eForth interpreter. It would be neat if we
+\ could reduce its size to under 4KiB, it is currently slightly
+\ over. It might be possible to make the VHDL CPU smaller with
+\ a bit-serial implementation, the instruction set might be
+\ redesigned to accommodate it (more specifically the shift
+\ instructions). If the LFSR program could be made to be under
+\ 127 words we could make the program counter even smaller,
+\ however it stands at 209 words at the moment of writing this.
 
 only forth also definitions hex
 
@@ -301,9 +308,9 @@ label: entry ( previous instructions are irrelevant )
 unlfsr
 
   \ Constants not variables
-  8000 tvar high       \ must contain `8000`
-  FF00 tvar ins        \ instruction mask
-  FFFF tvar set        \ all bits set, -1
+  8000 tvar high    \ must contain `8000`
+  FF00 tvar ins     \ instruction mask
+  FFFF tvar set     \ all bits set, -1
 
   \ These variables, along with some defined in the Forth
   \ code, need to be written to, hampering turning the
@@ -356,9 +363,9 @@ label: bitadd
      rlink iPC!
    then
    \ Fall-through...
-label: bitloop
+label: bitloop \ Perform addition, no carry
    r1 iLOAD-C
-   if
+   if \ Ideally we would put carry result in variable for `um+`
      r0 iAND
      r2 iSTORE-C
      r0 iLOAD-C
@@ -502,7 +509,7 @@ label: IncIp
   vm branch
   (a);
 
-a: opJumpZ
+a: opJumpZ ( jump if zero to next cell )
   tos iLOAD-C
   t iSTORE-C
   {sp} iLOAD
@@ -519,7 +526,7 @@ label: Jump ( A few instructions jump here to save space )
   ip iSTORE-C
   a;
 
-a: opNext
+a: opNext ( jump and pop top of return stack if zero )
   {rp} iLOAD
   if
     r0 iSTORE-C
@@ -527,7 +534,7 @@ a: opNext
     {rp} iSTORE
     Jump branch
   then
-  --rp
+  --rp ( otherwise decrement it and leave it there )
   IncIp branch
   (a);
 
@@ -654,13 +661,13 @@ a: rp! ( u -- , R: ??? --- ??? : set return stack depth )
   .drop branch
   (a);
 
-a: (emit) ( u -- )
+a: (emit) ( u -- : write a byte )
   tos iLOAD-C
   set iSTORE
   .drop branch
   (a);
 
-a: (key) ( -- u )
+a: (key) ( -- u : read a byte )
   ++sp
   tos iLOAD-C
   {sp} iSTORE
