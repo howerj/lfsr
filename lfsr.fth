@@ -362,9 +362,9 @@ label: bitadd
      r0 iSTORE-C
      rlink iPC!
    then
+   r1 iLOAD-C
    \ Fall-through...
 label: bitloop \ Perform addition, no carry
-   r1 iLOAD-C
    if \ Ideally we would put carry result in variable for `um+`
      r0 iAND
      r2 iSTORE-C
@@ -588,15 +588,19 @@ a: lrs ( u -- u : shift right by number of bits set )
 a: @ ( a -- u : load a memory address )
   tos iRSHIFT
   tos iSTORE-C
+  (a);
+a: ,@
   tos iLOAD
   tos iSTORE-C
   a;
 
 a: ! ( u a -- store a cell at a memory address )
   tos iRSHIFT
-  t iSTORE-C
+  tos iSTORE-C
+  (a);
+a: ,!
   {sp} iLOAD
-  t iSTORE
+  tos iSTORE
   --sp
   (a); ( fall-through )
 a: drop ( u -- : drop it like it's hot )
@@ -661,20 +665,6 @@ a: rp! ( u -- , R: ??? --- ??? : set return stack depth )
   .drop branch
   (a);
 
-a: (emit) ( u -- : write a byte )
-  tos iLOAD-C
-  set iSTORE
-  .drop branch
-  (a);
-
-a: (key) ( -- u : read a byte )
-  ++sp
-  tos iLOAD-C
-  {sp} iSTORE
-  set iLOAD
-  tos iSTORE-C
-  a;
-
 vmused
 \ There should be no more than 255 cells used by the previous
 \ virtual machine, if more are used a different polynomial
@@ -697,10 +687,10 @@ assembler.1 -order
 : 2* dup + ;         ( u -- u : multiply by two )
 : 2/ lrs ;           ( u -- u : divide by two )
 : ?dup dup if dup then ; ( u -- u u | 0 : dup if not zero )
-: rshift begin ?dup while 1- swap 2/ swap repeat ;
+: rshift begin ?dup while 1- swap lrs swap repeat ;
 : lshift begin ?dup while 1- swap 2* swap repeat ;
 :h (var) r> 2* ;t         ( -- a : used in `variable` )
-:h (const) r> :f v@ 2* @ ;t     ( -- u : used in `constant` )
+:h (const) r> ,@ ;t     ( -- u : used in `constant` )
 :m variable :t tdrop (var) 0 t, ;m ( meta-compiler `variable` )
 :m constant :t tdrop (const) t, ;m ( meta-compiler `constant` )
 :m hvar :h tdrop (var) 0 t, ;m     ( make headerless variable )
@@ -722,7 +712,7 @@ FF hconst #ff  ( -- 255 : space saving measure, push `255` )
 : or invert swap invert and invert ;
 : execute 2/ >r ; ( xt -- )
 : 0= if #0 exit then #-1 ; ( u -- f )
-:h bit #1 and ;
+:h bit #1 and ; ( u -- 0 | 1 )
 : c@ dup @ swap bit if 8 lit rshift then :f lsb #ff and ;
 : c! ( c b -- : store character at address )
   dup dup >r bit if
@@ -730,8 +720,8 @@ FF hconst #ff  ( -- 255 : space saving measure, push `255` )
   else
     @ FF00 lit and swap lsb
   then or r> ! ;
-: emit ( 8000 lit ! ) (emit) ; 
-: key? ( 8000 lit @ ) (key) #-1 ; ( -- ch -1 | 0 )
+: emit #-1 ,! ; 
+: key? #-1 ,@ #-1 ; ( -- ch -1 | 0 )
 variable state   ( -- a : compile/interpret state variable )
 variable dpl     ( -- a : double cell parse variable )
 variable hld     ( -- a : hold space variable )
@@ -763,7 +753,7 @@ hvar #h          ( -- a : dictionary pointer )
 : 0> #0 > ;             ( n -- f : greater than zero )
 : u< 2dup 0>= swap 0>= xor >r < r> xor ; ( u u -- f : )
 : cell+ cell + ;    ( a -- a : increment address to next cell )
-: pick sp@ + v@ ;     ( ??? u -- ??? u u : )
+: pick sp@ + ,@ ;     ( ??? u -- ??? u u : )
 : aligned dup bit + ; ( b -- u : align a pointer )
 : align here aligned :f h! #h ! ; ( -- : align dictionary ptr )
 : depth {sp0} lit @ sp@ - 1- ; ( -- u : var stack depth )
@@ -841,7 +831,7 @@ hvar #h          ( -- a : dictionary pointer )
 : query ( -- : get line )
    source drop =buf lit accept #tib ! drop #0 :f in! >in ! ;
 :h ?depth depth > -4 lit and throw ; ( u -- )
-:h base? base @ ;
+:h base? base @ ; ( -- u : numeric I/O radix )
 : spaces begin dup 0> while space 1- repeat drop ; ( +n -- )
 : hold #-1 hld +! hld @ c! ; ( c -- : save char to hold )
 : #> 2drop hld @ =tbufend lit over - ;  ( u -- b u )
@@ -947,7 +937,7 @@ hvar #h          ( -- a : dictionary pointer )
 : compile, 2/ align , ; ( xt -- )
 :h ?found if exit then ( u f -- )
    space count type [char] ? emit cr -D lit throw ; 
-: interpret ( b -- )
+: interpret ( b -- : find and interpret counted word )
   find ?dup if
     state @
     if
@@ -982,7 +972,7 @@ hvar #h          ( -- a : dictionary pointer )
   dup c@ 0= -A lit and throw
   count + h! align
   ] :f babez BABE lit ;
-:to ; postpone [ 
+:to ; postpone [ ( -- : terminate a word definition )
    babez <> -16 lit and throw 
    =unnest lit , ; immediate compile-only
 :to begin align here ; immediate compile-only
@@ -993,7 +983,7 @@ hvar #h          ( -- a : dictionary pointer )
 :to for =>r lit , here ; immediate compile-only
 :to next =next lit , compile, ; immediate compile-only
 :to ' bl word find ?found cfa literal ; immediate
-: compile r> dup v@ , 1+ >r ; compile-only
+: compile r> dup ,@ , 1+ >r ; compile-only
 :to >r compile >r ; immediate compile-only
 :to r> compile r> ; immediate compile-only
 :to r@ compile r@ ; immediate compile-only 
@@ -1009,7 +999,7 @@ hvar #h          ( -- a : dictionary pointer )
    begin bl word dup c@ while
    interpret #1 ?depth repeat drop ."  ok" cr ;
 :h ini hex  postpone [ #0 in! #-1 dpl ! ; ( -- )
-: info ( -- )
+: info ( -- : print out system information )
   cr
   ." Project: LFSR eForth" cr
   ." Author:  Richard James Howe" cr
