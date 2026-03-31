@@ -697,7 +697,7 @@ assembler.1 -order
 :m hconst :h tdrop (const) t, ;m   ( make headerless constant )
  0 hconst #0   ( -- 0 : space saving measure, push `0` )
 FF hconst #ff  ( -- 255 : space saving measure, push `255` )
-20 constant bl   ( -- space : push a space, 32 )
+20 hconst bl   ( -- space : push a space, 32 )
  2 constant cell ( -- u: size of memory cell in bytes )
 :to bye bye ; ( -- )
 :to and and ; ( u u -- u )
@@ -720,8 +720,6 @@ FF hconst #ff  ( -- 255 : space saving measure, push `255` )
   else
     @ FF00 lit and swap lsb
   then or r> ! ;
-: emit #-1 ,! ; 
-: key? #-1 ,@ #-1 ; ( -- ch -1 | 0 )
 variable state   ( -- a : compile/interpret state variable )
 variable dpl     ( -- a : double cell parse variable )
 variable hld     ( -- a : hold space variable )
@@ -752,6 +750,8 @@ hvar #h          ( -- a : dictionary pointer )
 : > swap < ;            ( n n -- f : signed greater than )
 : 0> #0 > ;             ( n -- f : greater than zero )
 : u< 2dup 0>= swap 0>= xor >r < r> xor ; ( u u -- f : )
+: emit #-1 ,! ; 
+: key? #-1 ,@ dup 0>= ; ( -- ch -1 | 0 )
 : cell+ cell + ;    ( a -- a : increment address to next cell )
 : pick sp@ + ,@ ;     ( ??? u -- ??? u u : )
 : aligned dup bit + ; ( b -- u : align a pointer )
@@ -761,10 +761,10 @@ hvar #h          ( -- a : dictionary pointer )
 : allot aligned #h +! ; ( u -- )
 : , align here ! cell allot ; ( u -- )
 : abs dup 0< if negate then ; ( n -- u )
-: mux dup >r and swap r> invert and or ; ( u1 u2 sel -- u )
+:h mux dup >r and swap r> invert and or ; ( u1 u2 sel -- u )
 : max 2dup < mux ;  ( n n -- n : maximum of two numbers )
 : min 2dup > mux ;  ( n n -- n : minimum of two numbers )
-: +string #1 over min rot over + rot rot - ; ( b u -- b u )
+:h +string #1 over min rot over + rot rot - ; ( b u -- b u )
 : catch ( xt -- exception# | 0 \ return addr on stack )
    sp@ >r         ( xt )   \ save data stack pointer
    #handler @ >r  ( xt )   \ and previous handler
@@ -805,7 +805,7 @@ hvar #h          ( -- a : dictionary pointer )
 :h .$ do$ count type ;  ( -- )
 :m ." .$ $literal ;m  ( meta-compiler string compilation )
 :m $" ($) $literal ;m ( meta-compiler string compilation )
-: space bl emit ;               ( -- : print space )
+:h space bl emit ;               ( -- : print space )
 : cr .$ 2 tc, =cr tc, =lf tc, ; ( -- : print new line )
 :h ktap ( bot eot cur c -- bot eot cur )
   dup dup =cr lit <> >r  =lf lit <> r> and if \ Not End Line?
@@ -832,7 +832,7 @@ hvar #h          ( -- a : dictionary pointer )
    source drop =buf lit accept #tib ! drop #0 :f in! >in ! ;
 :h ?depth depth > -4 lit and throw ; ( u -- )
 :h base? base @ ; ( -- u : numeric I/O radix )
-: spaces begin dup 0> while space 1- repeat drop ; ( +n -- )
+:h spaces begin dup 0> while space 1- repeat drop ; ( +n -- )
 : hold #-1 hld +! hld @ c! ; ( c -- : save char to hold )
 : #> 2drop hld @ =tbufend lit over - ;  ( u -- b u )
 : #  ( d -- d : add next character in number to hold space )
@@ -850,7 +850,7 @@ hvar #h          ( -- a : dictionary pointer )
 : u. space #0 u.r ;                              ( u -- )
 : . dup >r abs #0 <# #s r> sign #> space type ;  ( n -- )
 : .s depth for aft r@ pick . then next ;
-: -trailing ( b u -- b u : remove trailing spaces )
+:h -trailing ( b u -- b u : remove trailing spaces )
   for
     aft bl over r@ + c@ <
       if r> 1+ exit then
@@ -867,7 +867,6 @@ hvar #h          ( -- a : dictionary pointer )
   repeat rdrop bury ;
 :h no-match if 0> exit then :f 0<> 0= 0= ; ( c1 c2 -- t )
 :h match no-match invert ;          ( c1 c2 -- t )
-
 : parse ( c -- b u ; <string> )
   >r source drop >in @ + #tib @ >in @ - r@
   >r over r> swap >r >r
@@ -934,7 +933,7 @@ hvar #h          ( -- a : dictionary pointer )
   2drop #0 r> #0 ;
 : find last (find) bury ;  ( "name" -- b )
 : literal state @ if =push lit , , then ; immediate ( u -- )
-: compile, 2/ align , ; ( xt -- )
+:h compile, 2/ align , ; ( xt -- )
 :h ?found if exit then ( u f -- )
    space count type [char] ? emit cr -D lit throw ; 
 : interpret ( b -- : find and interpret counted word )
@@ -963,10 +962,10 @@ hvar #h          ( -- a : dictionary pointer )
 : word parse here dup >r 2dup ! 1+ swap cmove r> ; ( c -- b )
 : words last begin 
    dup nfa count 1f lit and space type @ ?dup 0= until ;
-: see bl word find ?found cr 
-  begin 
-    dup @ =unnest lit <> 
-  while dup @ u. cell+ repeat @ u. ;
+\ : see bl word find ?found cr 
+\  begin 
+\    dup @ =unnest lit <> 
+\  while dup @ u. cell+ repeat @ u. ;
 :to : align here last , #last ! ( "name" -- )
   bl word
   dup c@ 0= -A lit and throw
@@ -994,21 +993,17 @@ hvar #h          ( -- a : dictionary pointer )
 :to ( [char] ) parse 2drop ; immediate
 :to \ source drop @ in! ; immediate
 :to immediate last nfa @ 40 lit or last nfa ! ;
-: dump 2/ for dup @ u. cell+ next drop ;
+( : dump 2/ for dup @ u. cell+ next drop ; )
 : eval ( -- )
    begin bl word dup c@ while
-   interpret #1 ?depth repeat drop ."  ok" cr ;
+   interpret #1 ?depth repeat drop :f ok ."  ok" cr ;
 :h ini hex  postpone [ #0 in! #-1 dpl ! ; ( -- )
 : info ( -- : print out system information )
-  cr
-  ." Project: LFSR eForth" cr
-  ." Author:  Richard James Howe" cr
-  ." License: 0BSD / Public Domain" cr
-  ." Email:   howe.r.j.89@gmail.com" cr ;
+  ." LFSR eForth 3.4, 0BSD, RJHowe, howe.r.j.89@gmail.com" cr ;
 : quit ( -- : interpreter loop [and more] )
   there t2/ <cold> t! \ program entry point set here
   ini
-  ." eForth 3.3" cr 
+  ok
   begin
     query t' eval lit catch
     ( ?error -> ) ?dup if

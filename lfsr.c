@@ -11,7 +11,7 @@ enum { OLFSR = 1 << 0, OADD = 1 << 1, OFIRST = 1 << 2, };
 typedef struct {
 	uint16_t m[SZ], pc, a, opts, polynomial, pcmask;
 	int (*get)(void *in);
-	int (*put)(void *out, int ch);
+	int (*put)(void *out, const int ch);
 	void *in, *out;
 	FILE *debug;
 } vm_t;
@@ -41,7 +41,7 @@ static inline void store(vm_t *v, uint16_t addr, uint16_t val, long cycles) {
 }
 
 static int run(vm_t *v) {
-	uint16_t pc = v->pc, a = v->pc, *m = v->m, opts = v->opts, polynomial = v->polynomial, pcmask = v->pcmask;
+	uint16_t pc = v->pc, a = v->a, *m = v->m, opts = v->opts, polynomial = v->polynomial, pcmask = v->pcmask;
 	static const char *names[] = { "xor", "and", "lsl1", "lsr1", "load", "store", "jmp", "jmpz", };
 	for (long cycles = 0;;cycles++) { /* An `ADD` instruction things up greatly, `OR` not so much */
 		const uint16_t ins = m[pc % SZ];
