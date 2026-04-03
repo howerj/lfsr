@@ -118,7 +118,7 @@ The `INSTRUCTION` field is 3-bits in size, the instructions are:
 
 All instructions advance the program counter except `JUMP`, and
 (conditionally) `JUMPZ`. All instruction affect or use the accumulator
-except the jump instructions, and all arguments use the `ARG` value.
+except the JUMP instruction, and all arguments use the `ARG` value.
 `MEM` consists of a linear array of 16-bit values.
 
 There is one special address, address 0. This address is never
@@ -163,12 +163,13 @@ still.
 
 * [x] Get basic implementation working
 * [x] Port a Forth implementation to the machine.
-  - [ ]  Make a build target for a VM that is exactly the same except
+  - [ ] Make a build target for a VM that is exactly the same except
   it uses normal program counter. (optional)
 * [x] Optimize machine (remove Add instruction, put in indirect bit)
 * [x] Port to an FPGA
   - [x] See <https://github.com/howerj/lfsr-vhdl>
-  - [ ] make a bit-serial version? (optional)
+  - [ ] make a bit-serial version? (optional), it is not clear this will
+  save space.
 * [ ] Implement in 7400 series logic?
   - [ ] Separate the eForth image into `ROM` and `RAM` sections. We
   should able to make the first X KiB of the image read-only. This might

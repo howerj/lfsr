@@ -145,9 +145,6 @@ wordlist constant target.only.1
 
 meta.1 +order also definitions
 
-\ If VM size set to 4096 cells, setting `size` and `=end` to
-\ `1000` almost works
-
    2 constant =cell
 1000 constant size 
 1000 constant =end ( 8192 bytes, leaving half for DP-BRAM )
@@ -161,9 +158,11 @@ meta.1 +order also definitions
 
 create tflash size cells here over erase allot
 
-variable tdp
-variable tlast
+variable tvarp ( variable pointer )
+variable tdp   ( dictionary pointer )
+variable tlast ( last defined word pointer )
 0 tlast !
+=end 240 - 2* tvarp ! ( set area where variables are stored )
 
 variable vms 0 vms !
 variable pc 1 pc !
@@ -191,14 +190,16 @@ $FF constant period
 .( Polynomial sequence: ) cr
 ordering cr
 
-:m there tdp @ ;m
+:m there tdp @ ;m ( dictionary pointer location )
+:m tvere tvarp @ ;m ( variable location )
 :m tc! tflash + c! ;m
 :m tc@ tflash + c@ ;m
 :m t! over ff and over tc! swap 8 rshift swap 1+ tc! ;m
 :m t@ dup tc@ swap 1+ tc@ 8 lshift or ;m
 :m talign there 1 and tdp +! ;m
 :m tc, there tc! 1 tdp +! ;m
-:m t, there t! 2 tdp +! ;m
+:m t, there t! =cell tdp +! ;m
+:m v, tvere t! =cell negate tvarp +! ;m
 :m $literal [char] " word 
   count dup tc, 0 ?do count tc, loop drop talign ;m
 :m tallot tdp +! ;m
@@ -244,6 +245,8 @@ ordering cr
 :m .end only forth also definitions decimal ;m
 :m atlast tlast @ ;m
 :m tvar   get-current >r meta.1 set-current 
+          create r> set-current tvere , v, does> @ ;m
+:m tconst  get-current >r meta.1 set-current 
           create r> set-current there , t, does> @ ;m
 :m label: get-current >r meta.1 set-current 
           create r> set-current pc @ 2* ,    does> @ ;m
@@ -307,31 +310,28 @@ label: entry ( previous instructions are irrelevant )
 0 pc,  \ entry point of VM
 unlfsr
 
-  \ Constants not variables
-  8000 tvar high    \ must contain `8000`
-  FF00 tvar ins     \ instruction mask
-  FFFF tvar set     \ all bits set, -1
+  8000 tconst high \ must contain `8000`
+  FF00 tconst ins  \ instruction mask
+  FFFF tconst set  \ all bits set, -1
+  0 tconst {ip0}  \ entry point of virtual machine, set later
 
-  \ These variables, along with some defined in the Forth
-  \ code, need to be written to, hampering turning the
-  \ Forth interpreter into a Forth ROM. Instead, we could
-  \ use high memory locations for these variables instead,
-  \ if we need to ROM things.
-   0 tvar <cold>    \ entry point of virtual machine, set later
-   0 tvar ip        \ instruction pointer
-   0 tvar t         \ temporary register
-   0 tvar q         \ second, temporary, register
-   0 tvar r0        \ third, temporary, reg
-   0 tvar r1        \ fourth register
-   0 tvar r2        \ fifth register...
-   0 tvar tos       \ top of stack
-   0 tvar rlink     \ link register
-   0 tvar addon     \ ADD has replaced `LSHIFT by 1`
+  \ These must all be zero, they are stored near the stacks
+  \ and line buffers towards the end of the memory and do not
+  \ form a part of the generated image.
+
+  0 tvar ip        \ instruction pointer
+  0 tvar t         \ temporary register
+  0 tvar q         \ second, temporary, register
+  0 tvar r0        \ third, temporary, reg
+  0 tvar r1        \ fourth register
+  0 tvar r2        \ fifth register...
+  0 tvar tos       \ top of stack
+  0 tvar rlink     \ link register
 
 \ Set up stack pointers and line buffer at fixed locations
 =end 200 - 2* constant TERMBUF
-=end 100 - dup tvar {rp0} tvar {rp}
-=end 1- dup tvar {sp0} tvar {sp}
+=end 100 - dup tconst {rp0} tvar {rp}
+=end 1- dup tconst {sp0} tvar {sp}
 TERMBUF =buf 2* + constant =tbufend
 
 \ `link` uses `rlink` as a link register, this allows us to
@@ -348,6 +348,8 @@ TERMBUF =buf 2* + constant =tbufend
 assembler.1 +order
 label: sp-1
    {sp} iLOAD-C
+   \ Fall-through...
+label: r0bitinc
    r0 iSTORE-C
    \ Fall-through...
 label: bitinc
@@ -355,7 +357,7 @@ label: bitinc
    r1 iSTORE-C
    \ Fall-through...
 label: bitadd
-   addon iLOAD-C
+   high iLSHIFT
    if \ If `iLSHIFT` is actually an add instruction
      r0 iLOAD-C
      r1 iLSHIFT
@@ -380,6 +382,8 @@ label: bitloop \ Perform addition, no carry
 
 label: sp+1
    {sp} iLOAD-C
+   \ Fall-through...
+label: r0bitdec
    r0 iSTORE-C
    \ Fall-through...
 label: bitdec
@@ -389,13 +393,11 @@ label: bitdec
 
 label: rp-1
    {rp} iLOAD-C
-   r0 iSTORE-C
-   bitdec branch
+   r0bitdec branch
 
 label: rp+1
    {rp} iLOAD-C
-   r0 iSTORE-C
-   bitinc branch
+   r0bitinc branch
 
 assembler.1 -order
 
@@ -409,17 +411,10 @@ assembler.1 +order
 label: start \ Forth VM entry point
   start call entry t! \ Set entry point
 
-  \ Detect if iLSHIFT is actually an ADD instruction
-  0 iLITERAL
-  high iLSHIFT  
-  if
-    addon iSTORE-C \ iLSHIFT is actually add, store non-zero
-  then
-
   {sp0} iLOAD-C {sp} iSTORE-C \ Set initial v.stk ptr
   {rp0} iLOAD-C {rp} iSTORE-C \ Set initial r.stk ptr
-  <cold> iLOAD-C      \ Load initial word to execute
-  ip iSTORE-C         \ Set instruction pointer to word
+  {ip0} iLOAD-C      \ Load initial word to execute
+  ip iSTORE-C        \ Set instruction pointer to word
   \ -- fall-through --
 label: vm ( The Forth virtual machine )
 
@@ -504,7 +499,7 @@ a: opPush ( pushes next value in instr stream to the stack )
   {sp} iSTORE
   ip iLOAD
   tos iSTORE-C
-label: IncIp 
+label: IncIp
   ip iLOAD-C r0 iSTORE-C bitinc link ip iSTORE-C 
   vm branch
   (a);
@@ -589,7 +584,7 @@ a: @ ( a -- u : load a memory address )
   tos iRSHIFT
   tos iSTORE-C
   (a);
-a: ,@
+a: ,@ ( a -- u : load a word address )
   tos iLOAD
   tos iSTORE-C
   a;
@@ -598,7 +593,7 @@ a: ! ( u a -- store a cell at a memory address )
   tos iRSHIFT
   tos iSTORE-C
   (a);
-a: ,!
+a: ,! ( u a -- store a cell at a word address )
   {sp} iLOAD
   tos iSTORE
   --sp
@@ -750,8 +745,10 @@ hvar #h          ( -- a : dictionary pointer )
 : > swap < ;            ( n n -- f : signed greater than )
 : 0> #0 > ;             ( n -- f : greater than zero )
 : u< 2dup 0>= swap 0>= xor >r < r> xor ; ( u u -- f : )
-: emit #-1 ,! ; 
-: key? #-1 ,@ dup 0>= ; ( -- ch -1 | 0 )
+: emit #-1 ,! ; ( c -- : output a character / byte )
+\ `key?` should optionally call `bye`, depending on a compile
+\ time switch, on failure.
+: key? #-1 ,@ dup 0>= ; ( -- ch -1 | 0 : input byte )
 : cell+ cell + ;    ( a -- a : increment address to next cell )
 : pick sp@ + ,@ ;     ( ??? u -- ??? u u : )
 : aligned dup bit + ; ( b -- u : align a pointer )
@@ -849,7 +846,7 @@ hvar #h          ( -- a : dictionary pointer )
 : u.r >r #0 <# #s #>  r> over - spaces type ;    ( u +n -- )
 : u. space #0 u.r ;                              ( u -- )
 : . dup >r abs #0 <# #s r> sign #> space type ;  ( n -- )
-: .s depth for aft r@ pick . then next ;
+: .s depth for aft r@ pick . then next ; ( -- )
 :h -trailing ( b u -- b u : remove trailing spaces )
   for
     aft bl over r@ + c@ <
@@ -867,7 +864,7 @@ hvar #h          ( -- a : dictionary pointer )
   repeat rdrop bury ;
 :h no-match if 0> exit then :f 0<> 0= 0= ; ( c1 c2 -- t )
 :h match no-match invert ;          ( c1 c2 -- t )
-: parse ( c -- b u ; <string> )
+: parse ( c -- b u ; <string> : parse a string up to `c` )
   >r source drop >in @ + #tib @ >in @ - r@
   >r over r> swap >r >r
   r@ t' no-match lit look 2dup
@@ -960,9 +957,9 @@ hvar #h          ( -- a : dictionary pointer )
   r> #0 ?found \ Could vector ?found if we wanted to
   ;
 : word parse here dup >r 2dup ! 1+ swap cmove r> ; ( c -- b )
-: words last begin 
+: words last begin ( -- : display all loaded words )
    dup nfa count 1f lit and space type @ ?dup 0= until ;
-\ : see bl word find ?found cr 
+\ : see bl word find ?found cr ( "word" -- : decompile word )
 \  begin 
 \    dup @ =unnest lit <> 
 \  while dup @ u. cell+ repeat @ u. ;
@@ -994,14 +991,14 @@ hvar #h          ( -- a : dictionary pointer )
 :to \ source drop @ in! ; immediate
 :to immediate last nfa @ 40 lit or last nfa ! ;
 ( : dump 2/ for dup @ u. cell+ next drop ; )
-: eval ( -- )
+:h eval ( -- )
    begin bl word dup c@ while
    interpret #1 ?depth repeat drop :f ok ."  ok" cr ;
 :h ini hex  postpone [ #0 in! #-1 dpl ! ; ( -- )
 : info ( -- : print out system information )
-  ." LFSR eForth 3.4, 0BSD, RJHowe, howe.r.j.89@gmail.com" cr ;
+  cr ." LFSR eForth 3.4, 0BSD, RJHowe, howe.r.j.89@gmail.com" ;
 : quit ( -- : interpreter loop [and more] )
-  there t2/ <cold> t! \ program entry point set here
+  there t2/ {ip0} t! \ program entry point set here
   ini
   ok
   begin
