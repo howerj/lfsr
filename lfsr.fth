@@ -135,6 +135,9 @@ wordlist constant target.1
 wordlist constant assembler.1
 wordlist constant target.only.1
 
+\ Compile time options
+0 constant opt.eof-bye ( 1 = bye on EOF, 0 = non-blocking )
+
 : (order) ( u wid*n n -- wid*n u n )
    dup if
     1- swap >r recurse over r@ xor if
@@ -145,7 +148,7 @@ wordlist constant target.only.1
 
 meta.1 +order also definitions
 
-   2 constant =cell
+   2 constant =cell ( size of a cell in the target )
 1000 constant size 
 1000 constant =end ( 8192 bytes, leaving half for DP-BRAM )
   40 constant =stksz
@@ -264,12 +267,12 @@ ordering cr
 :m unlfsr period 2* there + tallot ;m
 :m pc, pc @ 2* t! pc++ ;m
 
-: jump-val 6000 ; \ jump instruction value
-: rshift-val 3000 ;
+: jump-val 6000 ;   \ jump instruction value
+: rshift-val 3000 ; \ rshift instruction value
 
-: iXOR     2/ 8000 0000 or or pc, ;
-: iAND     2/ 8000 1000 or or pc, ;
-: iLSHIFT  2/ 8000 2000 or or pc, ; 
+: iXOR     2/ 8000 0000 or or pc, ; \ Bitwise XOR
+: iAND     2/ 8000 1000 or or pc, ; \ Bitwise AND
+: iLSHIFT  2/ 8000 2000 or or pc, ; \ LSHIFT only by 1
 : iRSHIFT  2/ 8000 rshift-val or or pc, ; \ RSHIFT only by 1
 : iLOAD-C  2/ 4000 or pc, ; \ Load immediate
 : iLOAD    2/ 8000 4000 or or pc, ; \ Load through immediate
@@ -279,9 +282,9 @@ ordering cr
 : iPC!     2/ 8000 jump-val or or pc, ; \ Indirect Jump
 : iJUMPZ   2/ 7000 or pc, ; \ Conditional Jump!
 : iPC!Z    2/ 8000 7000 or or pc, ; \ Indirect Cond. Jump!
-: iLITERAL
-  2* dup $F000 and 0<> abort" literal too large"
-  rshift-val or pc, ;
+: (iLITERAL)  2* dup $F000 and 0<> abort" literal too large"
+  rshift-val or ;
+: iLITERAL (iLITERAL) pc, ;
 
 : branch iJUMP ;
 : ?branch iJUMPZ ;
@@ -339,11 +342,14 @@ TERMBUF =buf 2* + constant =tbufend
 \ within that function (but we can branch to them as the
 \ last instruction of a call). These functions must load
 \ and jump through `rlink` at the end with `rlink iPC!`.
+
+:m tail-link 
+   iLITERAL \ place to return to
+   rlink iSTORE-C \ store in link register
+   branch \ branch to link function
+   ;m
 :m link ( a -- : perform limited call with link register )
-   there iLOAD-C   \ load location where we will store PC
-   rlink iSTORE-C  \ store in link register
-   branch          \ branch to function
-   pc @ t, ;m      \ store PC to be loaded by fist instruction
+   pc @ lfsr lfsr lfsr tail-link ;m
 
 assembler.1 +order
 label: sp-1
@@ -564,9 +570,7 @@ a: + \ Computing carry and making `um+` would speed things up
   r0 iSTORE-C
   {sp} iLOAD
   r1 iSTORE-C
-  bitadd link 
-  there 2 - decSp 2/ swap t! \ link jumps to decSp after call
-\  decSp branch \ The previous line replaces this one
+  bitadd decSp 2/ tail-link 
   (a);
 
 a: xor ( u u -- u : bit wise XOR )
@@ -746,9 +750,11 @@ hvar #h          ( -- a : dictionary pointer )
 : 0> #0 > ;             ( n -- f : greater than zero )
 : u< 2dup 0>= swap 0>= xor >r < r> xor ; ( u u -- f : )
 : emit #-1 ,! ; ( c -- : output a character / byte )
-\ `key?` should optionally call `bye`, depending on a compile
-\ time switch, on failure.
-: key? #-1 ,@ dup 0>= ; ( -- ch -1 | 0 : input byte )
+opt.eof-bye [if] ( -- ch -1 | 0 : input byte )
+: key? #-1 ,@ dup 0< if bye then #-1 ;
+[else]
+: key? #-1 ,@ dup 0>= if #-1 exit then drop #0 ;
+[then]
 : cell+ cell + ;    ( a -- a : increment address to next cell )
 : pick sp@ + ,@ ;     ( ??? u -- ??? u u : )
 : aligned dup bit + ; ( b -- u : align a pointer )
