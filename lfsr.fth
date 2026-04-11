@@ -151,13 +151,13 @@ meta.1 +order also definitions
    2 constant =cell ( size of a cell in the target )
 1000 constant size 
 1000 constant =end ( 8192 bytes, leaving half for DP-BRAM )
-  40 constant =stksz
+  40 constant =stksz \ size of stacks
   80 constant =buf
 
-0008 constant =bksp
-000A constant =lf
-000D constant =cr
-007F constant =del
+0008 constant =bksp \ backspace
+000A constant =lf   \ line feed
+000D constant =cr   \ carriage return
+007F constant =del  \ delete key
 
 create tflash size cells here over erase allot
 
@@ -213,7 +213,7 @@ ordering cr
   parse-word dup tc, 0 ?do count tc, loop drop talign ;m
 :m hex# ( u -- addr len )  
   0 <# base @ >r hex =lf hold # # # # r> base ! #> ;m
-:m c#
+:m c# ( u -- )
   0 <# base @ >r hex 
     =lf hold 
     [char] , hold
@@ -579,7 +579,13 @@ a: xor ( u u -- u : bit wise XOR )
   decSp branch
   (a);
 
-a: lrs ( u -- u : shift right by number of bits set )
+a: lls ( u -- u : shift left by one)
+  tos iLOAD-C \ Needed is shift left by one is actually `add`
+  tos iLSHIFT
+  tos iSTORE-C
+  a;
+
+a: lrs ( u -- u : shift right by one )
   tos iRSHIFT
   tos iSTORE-C
   a;
@@ -634,22 +640,22 @@ a: >r ( u -- , R: -- u )
 :m =>r [ t' >r ] literal t2/ ;m
 :m =next [ t' opNext ] literal t2/ ;m
 
+label: rxchg
+  tos iLOAD-C
+  {sp} iSTORE
+  {rp} iLOAD
+  tos iSTORE-C
+  rlink iPC!
+
 a: r> ( If feels like this could be merged with `r@`... )
   ++sp
-  tos iLOAD-C
-  {sp} iSTORE
-  {rp} iLOAD
-  tos iSTORE-C
-  .rdrop branch
+  rxchg .rdrop 2/ tail-link
   (a); 
- 
+
 a: r@ ( -- u, R: u -- u )
   ++sp
-  tos iLOAD-C
-  {sp} iSTORE
-  {rp} iLOAD
-  tos iSTORE-C
-  a;
+  rxchg vm 2/ tail-link
+  (a);
 
 a: sp! ( ??? u -- ??? : set stack depth )
   tos iLOAD-C
@@ -683,7 +689,7 @@ assembler.1 -order
 : invert #-1 xor ; ( u -- u )
 : negate 1- invert ; ( n -- n : negate [twos compliment] )
 : - negate + ;       ( u u -- u : subtract )
-: 2* dup + ;         ( u -- u : multiply by two )
+: 2* lls ;         ( u -- u : multiply by two )
 : 2/ lrs ;           ( u -- u : divide by two )
 : ?dup dup if dup then ; ( u -- u u | 0 : dup if not zero )
 : rshift begin ?dup while 1- swap lrs swap repeat ;
