@@ -137,6 +137,7 @@ wordlist constant target.only.1
 
 \ Compile time options
 0 constant opt.eof-bye ( 1 = bye on EOF, 0 = non-blocking )
+1 constant opt.support-add ( support optional add instr. )
 
 : (order) ( u wid*n n -- wid*n u n )
    dup if
@@ -363,6 +364,7 @@ label: bitinc
    r1 iSTORE-C
    \ Fall-through...
 label: bitadd
+opt.support-add [if]
    high iLSHIFT
    if \ If `iLSHIFT` is actually an add instruction
      r0 iLOAD-C
@@ -370,6 +372,7 @@ label: bitadd
      r0 iSTORE-C
      rlink iPC!
    then
+[then]
    r1 iLOAD-C
    \ Fall-through...
 label: bitloop \ Perform addition, no carry
@@ -580,7 +583,9 @@ a: xor ( u u -- u : bit wise XOR )
   (a);
 
 a: lls ( u -- u : shift left by one)
+opt.support-add [if] ( only needed to supported `add` )
   tos iLOAD-C \ Needed is shift left by one is actually `add`
+[then]
   tos iLSHIFT
   tos iSTORE-C
   a;
@@ -640,7 +645,7 @@ a: >r ( u -- , R: -- u )
 :m =>r [ t' >r ] literal t2/ ;m
 :m =next [ t' opNext ] literal t2/ ;m
 
-label: rxchg
+label: rxchg ( exchange values with R and V stack )
   tos iLOAD-C
   {sp} iSTORE
   {rp} iLOAD
