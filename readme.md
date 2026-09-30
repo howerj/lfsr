@@ -159,7 +159,7 @@ This instruction set might change depending on the implementation,
 or when it comes to implementation, to make things easier and smaller
 still.
 
-# To Do
+# To Do (or a wish list, really)
 
 * [x] Get basic implementation working
 * [x] Port a Forth implementation to the machine.

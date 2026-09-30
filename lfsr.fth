@@ -153,7 +153,7 @@ meta.1 +order also definitions
 1000 constant size 
 1000 constant =end ( 8192 bytes, leaving half for DP-BRAM )
   40 constant =stksz \ size of stacks
-  80 constant =buf
+  80 constant =buf  \ buffer location for storing input text
 
 0008 constant =bksp \ backspace
 000A constant =lf   \ line feed
@@ -317,7 +317,7 @@ unlfsr
   8000 tconst high \ must contain `8000`
   FF00 tconst ins  \ instruction mask
   FFFF tconst set  \ all bits set, -1
-  0 tconst {ip0}  \ entry point of virtual machine, set later
+  0 tconst {ip0}   \ entry point of virtual machine, set later
 
   \ These must all be zero, they are stored near the stacks
   \ and line buffers towards the end of the memory and do not
@@ -353,17 +353,17 @@ TERMBUF =buf 2* + constant =tbufend
    pc @ lfsr lfsr lfsr tail-link ;m
 
 assembler.1 +order
-label: sp-1
+label: sp-1 \ Decrement variable stack pointer
    {sp} iLOAD-C
    \ Fall-through...
-label: r0bitinc
+label: r0bitinc ( Store ACC in R0 and then increment it ) 
    r0 iSTORE-C
    \ Fall-through...
-label: bitinc
+label: bitinc  ( increment R0 )
    1 iLITERAL
    r1 iSTORE-C
    \ Fall-through...
-label: bitadd
+label: bitadd \ add r0 and r1 registers together
 opt.support-add [if]
    high iLSHIFT
    if \ If `iLSHIFT` is actually an add instruction
@@ -387,29 +387,30 @@ label: bitloop \ Perform addition, no carry
      bitloop branch
    then
    r0 iLOAD-C \ Return result in accumulator
-   rlink iPC!
+   rlink iPC! \ Return via jumping through link register
 
-label: sp+1
+label: sp+1 ( increment variable stack pointer by one )
    {sp} iLOAD-C
    \ Fall-through...
-label: r0bitdec
+label: r0bitdec ( store ACC to R0 and decrement it  )
    r0 iSTORE-C
    \ Fall-through...
-label: bitdec
+label: bitdec ( decrement R0 bye one )
    set iLOAD-C
    r1 iSTORE-C
    bitadd branch
 
-label: rp-1
+label: rp-1 ( decrement return stack pointer by one )
    {rp} iLOAD-C
    r0bitdec branch
 
-label: rp+1
+label: rp+1 ( increment the return stack pointer by one )
    {rp} iLOAD-C
    r0bitinc branch
 
 assembler.1 -order
 
+\ increment and decrement stack pointers
 : --sp sp-1 link {sp} iSTORE-C ;
 : ++sp sp+1 link {sp} iSTORE-C ;
 : --rp rp-1 link {rp} iSTORE-C ;
@@ -560,6 +561,12 @@ a: opNext ( jump and pop top of return stack if zero )
 :m aft drop mark begin swap ;m
 :m next talign opNext 2/ t, ;m
 
+\ This section contains instructions for the virtual machine
+\ we are building that can support a Forth interpreter.
+
+\ This "halts" the CPU by performing a jump to itself, the
+\ C VM detects this condition and exits, the VHDL/FPGA version
+\ just locks up to indicate halting.
 a: bye pc @ 2* branch (a);   ( -- : bye bye! )
 
 a: and ( u u -- u : bit wise AND )
@@ -709,6 +716,9 @@ assembler.1 -order
 FF hconst #ff  ( -- 255 : space saving measure, push `255` )
 20 hconst bl   ( -- space : push a space, 32 )
  2 constant cell ( -- u: size of memory cell in bytes )
+\ Words defined like "bye bye", "and and" define a new
+\ word in the target dictionary using an old definition (in
+\ this case a call to an assembler definition.
 :to bye bye ; ( -- )
 :to and and ; ( u u -- u )
 :to xor xor ; ( u u -- u )
